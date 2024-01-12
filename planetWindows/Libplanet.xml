@@ -1,0 +1,2914 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>Libplanet</name>
+    </assembly>
+    <members>
+        <member name="T:Libplanet.Blockchain.BlockChain">
+            <summary>
+            <para>
+            A class have <see cref="T:Libplanet.Types.Blocks.Block"/>s, <see cref="T:Libplanet.Types.Tx.Transaction"/>s, and the chain
+            information.
+            </para>
+            <para>
+            In order to watch its state changes, implement <see cref="T:Libplanet.Blockchain.Renderers.IRenderer"/> interface
+            and pass it to the
+            <see cref="M:Libplanet.Blockchain.BlockChain.#ctor(Libplanet.Blockchain.Policies.IBlockPolicy,Libplanet.Blockchain.Policies.IStagePolicy,Libplanet.Store.IStore,Libplanet.Store.IStateStore,Libplanet.Types.Blocks.Block,Libplanet.Action.State.IBlockChainStates,Libplanet.Action.IActionEvaluator,System.Collections.Generic.IEnumerable{Libplanet.Blockchain.Renderers.IRenderer})"/>
+            constructor.
+            </para>
+            </summary>
+            <remarks>This object is guaranteed that it has at least one block, since it takes a genesis
+            block when it's instantiated.</remarks>
+        </member>
+        <member name="F:Libplanet.Blockchain.BlockChain._blocks">
+            <summary>
+            All <see cref="T:Libplanet.Types.Blocks.Block"/>s in the <see cref="T:Libplanet.Blockchain.BlockChain"/>
+            storage, including orphan <see cref="T:Libplanet.Types.Blocks.Block"/>s.
+            Keys are <see cref="P:Libplanet.Types.Blocks.Block.Hash"/>es and values are
+            their corresponding <see cref="T:Libplanet.Types.Blocks.Block"/>s.
+            </summary>
+        </member>
+        <member name="F:Libplanet.Blockchain.BlockChain._genesis">
+            <summary>
+            Cached genesis block.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.#ctor(Libplanet.Blockchain.Policies.IBlockPolicy,Libplanet.Blockchain.Policies.IStagePolicy,Libplanet.Store.IStore,Libplanet.Store.IStateStore,Libplanet.Types.Blocks.Block,Libplanet.Action.State.IBlockChainStates,Libplanet.Action.IActionEvaluator,System.Collections.Generic.IEnumerable{Libplanet.Blockchain.Renderers.IRenderer})">
+            <summary>
+            Initializes a new instance of the <see cref="T:Libplanet.Blockchain.BlockChain"/> class by loading
+            the canonical chain from given <paramref name="store"/>.
+            </summary>
+            <param name="policy"><see cref="T:Libplanet.Blockchain.Policies.IBlockPolicy"/> to use in the
+            <see cref="T:Libplanet.Blockchain.BlockChain"/>.</param>
+            <param name="stagePolicy">The staging policy to follow.</param>
+            <param name="store"><see cref="T:Libplanet.Store.IStore"/> to store <see cref="T:Libplanet.Types.Blocks.Block"/>s,
+            <see cref="T:Libplanet.Types.Tx.Transaction"/>s, and <see cref="T:Libplanet.Blockchain.BlockChain"/> information.</param>
+            <param name="genesisBlock">The genesis <see cref="T:Libplanet.Types.Blocks.Block"/> of
+            the <see cref="T:Libplanet.Blockchain.BlockChain"/>, which is a part of the consensus.
+            If the given <paramref name="store"/> already contains the genesis block
+            it checks if the existing genesis block and this argument is the same.
+            If the <paramref name="store"/> has no genesis block yet this argument will
+            be used for that.</param>
+            <param name="blockChainStates">The <see cref="T:Libplanet.Action.State.IBlockChainStates"/> implementation for
+            state lookup.</param>
+            <param name="actionEvaluator">The <see cref="P:Libplanet.Blockchain.BlockChain.ActionEvaluator" /> implementation to
+            calculate next states when append new blocks.</param>
+            <param name="renderers">Listens state changes on the created chain.  Listens nothing
+            by default or if it is <see langword="null"/>.  Note that action renderers receive
+            events made by unsuccessful transactions too; see also
+            <see cref="T:Libplanet.Blockchain.Renderers.AtomicActionRenderer"/> for workaround.</param>
+            <param name="stateStore"><see cref="T:Libplanet.Store.IStateStore"/> to store states.</param>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="store"/> does not
+            have canonical chain id set, i.e. <see cref="M:Libplanet.Store.IStore.GetCanonicalChainId"/> is
+            <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentNullException">Thrown when either of <paramref name="store"/>
+            or <paramref name="stateStore"/> is <see langword="null"/>.</exception>
+            <exception cref="T:Libplanet.Types.Blocks.InvalidGenesisBlockException">Thrown when the <paramref name="store"/>
+            has a genesis block and it does not match to what the network expects
+            (i.e., <paramref name="genesisBlock"/>).</exception>
+        </member>
+        <member name="E:Libplanet.Blockchain.BlockChain.TipChanged">
+            <summary>
+            An event which is invoked when <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/> is changed.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Renderers">
+            <summary>
+            The list of registered renderers listening the state changes.
+            </summary>
+            <remarks>
+            Since this value is immutable, renderers cannot be registered after once a <see
+            cref="T:Libplanet.Blockchain.BlockChain"/> object is instantiated; use <c>renderers</c> option of
+            <see cref="M:Libplanet.Blockchain.BlockChain.#ctor(Libplanet.Blockchain.Policies.IBlockPolicy,Libplanet.Blockchain.Policies.IStagePolicy,Libplanet.Store.IStore,Libplanet.Store.IStateStore,Libplanet.Types.Blocks.Block,Libplanet.Action.State.IBlockChainStates,Libplanet.Action.IActionEvaluator,System.Collections.Generic.IEnumerable{Libplanet.Blockchain.Renderers.IRenderer})"/>
+            constructor instead.
+            </remarks>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.ActionRenderers">
+            <summary>
+            A filtered list, from <see cref="P:Libplanet.Blockchain.BlockChain.Renderers"/>, which contains only <see
+            cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> instances.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Policy">
+            <summary>
+            The block and blockchain policy.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.StagePolicy">
+            <summary>
+            The staging policy.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Tip">
+            <summary>
+            The topmost <see cref="T:Libplanet.Types.Blocks.Block"/> of the current blockchain.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Genesis">
+            <summary>
+            The first <see cref="T:Libplanet.Types.Blocks.Block"/> in the <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.BlockHashes">
+            <summary>
+            All <see cref="P:Libplanet.Types.Blocks.Block.Hash"/>es in the current index.  The genesis block's hash goes
+            first, and the tip goes last.
+            Returns a <see cref="T:System.Int64"/> integer that represents the number of elements in the
+            <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Count">
+            <summary>
+            Returns a <see cref="T:System.Int64"/> that represents the number of <see cref="T:Libplanet.Types.Blocks.Block"/>s in a
+            <see cref="T:Libplanet.Blockchain.BlockChain"/>.  This is guaranteed to be greater than or equal to 1,
+            as <see cref="T:Libplanet.Blockchain.BlockChain"/> always contains at least
+            its genesis <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            </summary>
+            <returns>The number of <see cref="T:Libplanet.Types.Blocks.Block"/>s in the <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </returns>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.IsCanonical">
+            <summary>
+            Whether the instance is canonical or not.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Item(System.Int32)">
+            <summary>
+            Gets the block corresponding to the <paramref name="index"/>.
+            </summary>
+            <param name="index">A number of index of <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when the given index of
+            <see cref="T:Libplanet.Types.Blocks.Block"/> does not exist.</exception>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Item(System.Int64)">
+            <summary>
+            Gets the block corresponding to the <paramref name="index"/>.
+            </summary>
+            <param name="index">A number of index of <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when the given index of
+            <see cref="T:Libplanet.Types.Blocks.Block"/> does not exist.</exception>
+        </member>
+        <member name="P:Libplanet.Blockchain.BlockChain.Item(Libplanet.Types.Blocks.BlockHash@)">
+            <summary>
+            Gets the block corresponding to the <paramref name="blockHash"/>.
+            </summary>
+            <param name="blockHash">A <see cref="P:Libplanet.Types.Blocks.Block.Hash"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/> to
+            get. </param>
+            <exception cref="T:System.Collections.Generic.KeyNotFoundException">Thrown when there is no <see cref="T:Libplanet.Types.Blocks.Block"/>
+            with a given <paramref name="blockHash"/>.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.Create(Libplanet.Blockchain.Policies.IBlockPolicy,Libplanet.Blockchain.Policies.IStagePolicy,Libplanet.Store.IStore,Libplanet.Store.IStateStore,Libplanet.Types.Blocks.Block,Libplanet.Action.IActionEvaluator,System.Collections.Generic.IEnumerable{Libplanet.Blockchain.Renderers.IRenderer},Libplanet.Action.State.IBlockChainStates)">
+            <summary>
+            Creates a new instance of <see cref="T:Libplanet.Blockchain.BlockChain"/> from an empty
+            <see cref="T:Libplanet.Store.IStore"/>.
+            </summary>
+            <returns>A newly created <see cref="T:Libplanet.Blockchain.BlockChain"/>.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when either <paramref name="store"/>
+            or <paramref name="stateStore"/> is <see langword="null"/>.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="store"/> already has a
+            canonical chain id.</exception>
+            <exception cref="T:Libplanet.Types.Blocks.InvalidBlockException">Thrown when <paramref name="genesisBlock"/>
+            is invalid.</exception>
+            <exception cref="T:Libplanet.Types.Tx.InvalidTxException">Thrown when <paramref name="genesisBlock"/>
+            contains an invalid <see cref="T:Libplanet.Types.Tx.Transaction"/>.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ContainsBlock(Libplanet.Types.Blocks.BlockHash)">
+            <summary>
+            Determines whether the <see cref="T:Libplanet.Blockchain.BlockChain"/> contains <see cref="T:Libplanet.Types.Blocks.Block"/>
+            the specified <paramref name="blockHash"/>.
+            </summary>
+            <param name="blockHash">The <see cref="T:Libplanet.Common.HashDigest`1"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/> to
+            check if it is in the <see cref="T:Libplanet.Blockchain.BlockChain"/>.</param>
+            <returns>
+            <see langword="true"/> if the <see cref="T:Libplanet.Blockchain.BlockChain"/> contains
+            <see cref="T:Libplanet.Types.Blocks.Block"/> with the specified <paramref name="blockHash"/>; otherwise,
+            <see langword="false"/>.
+            </returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetTransaction(Libplanet.Types.Tx.TxId)">
+            <summary>
+            Gets the transaction corresponding to the <paramref name="txId"/>.
+            </summary>
+            <param name="txId">A <see cref="T:Libplanet.Types.Tx.TxId"/> of the <see cref="T:Libplanet.Types.Tx.Transaction"/> to get.
+            </param>
+            <returns><see cref="T:Libplanet.Types.Tx.Transaction"/> with <paramref name="txId"/>.</returns>
+            <exception cref="T:System.Collections.Generic.KeyNotFoundException">Thrown when there is no
+            <see cref="T:Libplanet.Types.Tx.Transaction"/> with a given <paramref name="txId"/>.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetState(Libplanet.Crypto.Address)">
+            <summary>
+            Gets the current state of given <paramref name="address"/> in the
+            <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+            <param name="address">An <see cref="T:Libplanet.Crypto.Address"/> to get the states of.</param>
+            <returns>The current state of given <paramref name="address"/>.  This can be
+            <see langword="null"/> if <paramref name="address"/> has no value.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetState(Libplanet.Crypto.Address,System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetState(Libplanet.Crypto.Address,System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetStates(System.Collections.Generic.IReadOnlyList{Libplanet.Crypto.Address})">
+            <summary>
+            Gets multiple states associated to the specified <paramref name="addresses"/>.
+            </summary>
+            <param name="addresses">Addresses of states to query.</param>
+            <returns>The states associated to the specified <paramref name="addresses"/>.
+            Associated values are ordered in the same way to the corresponding
+            <paramref name="addresses"/>.  Absent states are represented as <see langword="null"/>.
+            </returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetStates(System.Collections.Generic.IReadOnlyList{Libplanet.Crypto.Address},System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetStates(System.Collections.Generic.IReadOnlyList{Libplanet.Crypto.Address},System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetBalance(Libplanet.Crypto.Address,Libplanet.Types.Assets.Currency)">
+            <summary>
+            Queries <paramref name="address"/>'s current balance of the <paramref name="currency"/>
+            in the <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+            <param name="address">The owner <see cref="T:Libplanet.Crypto.Address"/> to query.</param>
+            <param name="currency">The currency type to query.</param>
+            <returns>The <paramref name="address"/>'s current balance.
+            </returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetBalance(Libplanet.Crypto.Address,Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetBalance(Libplanet.Crypto.Address,Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetTotalSupply(Libplanet.Types.Assets.Currency)">
+            <summary>
+            Gets the current total supply of a <paramref name="currency"/> in the
+            <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+            <param name="currency">The currency type to query.</param>
+            <returns>The total supply value of <paramref name="currency"/> at
+            <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/> in <see cref="T:Libplanet.Types.Assets.FungibleAssetValue"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetTotalSupply(Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetTotalSupply(Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetValidatorSet(System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetValidatorSet(System.Nullable{Libplanet.Types.Blocks.BlockHash})" />
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetAccountState(System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetAccountState(System.Nullable{Libplanet.Types.Blocks.BlockHash})" />
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetAccountState(System.Nullable{Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256}})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetAccountState(System.Nullable{Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256}})" />
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetTxExecution(Libplanet.Types.Blocks.BlockHash,Libplanet.Types.Tx.TxId)">
+            <summary>
+            Queries the recorded <see cref="T:Libplanet.Types.Tx.TxExecution"/> for a successful or failed
+            <see cref="T:Libplanet.Types.Tx.Transaction"/> within a <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            </summary>
+            <param name="blockHash">The <see cref="P:Libplanet.Types.Blocks.Block.Hash"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/>
+            that the <see cref="T:Libplanet.Types.Tx.Transaction"/> is executed within.</param>
+            <param name="txid">The executed <see cref="T:Libplanet.Types.Tx.Transaction"/>'s
+            <see cref="P:Libplanet.Types.Tx.Transaction.Id"/>.</param>
+            <returns>The recorded <see cref="T:Libplanet.Types.Tx.TxExecution"/>.  If the transaction has never been
+            executed within the block, it returns <see langword="null"/> instead.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.Append(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.BlockCommit)">
+            <summary>
+            Adds a <paramref name="block"/> to the end of this chain.
+            <para><see cref="P:Libplanet.Types.Blocks.Block.Transactions"/> in the <paramref name="block"/> updates
+            states and balances in the blockchain, and <see cref="T:Libplanet.Types.Tx.TxExecution"/>s for
+            transactions are recorded.</para>
+            <para>Note that <see cref="P:Libplanet.Blockchain.BlockChain.Renderers"/> receive events right after the <paramref
+            name="block"/> is confirmed (and thus all states reflect changes in the <paramref
+            name="block"/>).</para>
+            </summary>
+            <param name="block">A next <see cref="T:Libplanet.Types.Blocks.Block"/>, which is mined,
+            to add.</param>
+            <param name="blockCommit">A <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> that has +2/3 commits for the
+            given block.</param>
+            <exception cref="T:Libplanet.Types.Blocks.BlockPolicyViolationException">Thrown when given
+            <paramref name="block"/> does not satisfy any of the constraints
+            validated by <see cref="M:Libplanet.Blockchain.Policies.IBlockPolicy.ValidateNextBlock(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.Block)"/> of <see cref="P:Libplanet.Blockchain.BlockChain.Policy"/>.
+            </exception>
+            <exception cref="T:Libplanet.Types.Blocks.InvalidBlockException">Thrown when the given <paramref name="block"/>
+            is invalid, in itself or according to the <see cref="P:Libplanet.Blockchain.BlockChain.Policy"/>.</exception>
+            <exception cref="T:Libplanet.Action.InvalidActionException">Thrown when given <paramref name="block"/>
+            contains an action that cannot be loaded with <see cref="T:Libplanet.Action.Loader.IActionLoader"/>.</exception>
+            <exception cref="T:Libplanet.Types.Tx.InvalidTxNonceException">Thrown when the
+            <see cref="P:Libplanet.Types.Tx.Transaction.Nonce"/> is different from
+            <see cref="M:Libplanet.Blockchain.BlockChain.GetNextTxNonce(Libplanet.Crypto.Address)"/> result of the
+            <see cref="P:Libplanet.Types.Tx.Transaction.Signer"/>.</exception>
+            <exception cref="T:Libplanet.Types.Blocks.InvalidBlockCommitException">Thrown when the given
+            <paramref name="block"/> and <paramref name="blockCommit"/> is invalid.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.StageTransaction(Libplanet.Types.Tx.Transaction)">
+            <summary>
+            Adds <paramref name="transaction"/> to the pending list so that a next
+            <see cref="T:Libplanet.Types.Blocks.Block"/> to be mined may contain given <paramref name="transaction"/>.
+            </summary>
+            <param name="transaction"><see cref="T:Libplanet.Types.Tx.Transaction"/> to add to the pending list.
+            </param>
+            <returns><see langword="true"/> if staging was successful,
+            <see langword="false"/> otherwise.</returns>
+            <exception cref="T:Libplanet.Types.Tx.InvalidTxGenesisHashException">Thrown when given
+            <paramref name="transaction"/> has invalid <see cref="P:Libplanet.Types.Tx.Transaction.GenesisHash"/>.
+            </exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.UnstageTransaction(Libplanet.Types.Tx.Transaction)">
+            <summary>
+            Removes a <paramref name="transaction"/> from the pending list.
+            </summary>
+            <param name="transaction">A <see cref="T:Libplanet.Types.Tx.Transaction"/>
+            to remove from the pending list.</param>
+            <returns><see langword="true"/> if unstaging was successful,
+            <see langword="false"/> otherwise.</returns>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.StageTransaction(Libplanet.Types.Tx.Transaction)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetNextTxNonce(Libplanet.Crypto.Address)">
+            <summary>
+            Gets next <see cref="P:Libplanet.Types.Tx.Transaction.Nonce"/> of the address.
+            </summary>
+            <param name="address">The <see cref="T:Libplanet.Crypto.Address"/> from which to obtain the
+            <see cref="P:Libplanet.Types.Tx.Transaction.Nonce"/> value.</param>
+            <returns>The next <see cref="P:Libplanet.Types.Tx.Transaction.Nonce"/> value of the
+            <paramref name="address"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.MakeTransaction(Libplanet.Crypto.PrivateKey,System.Collections.Generic.IEnumerable{Libplanet.Action.IAction},System.Nullable{Libplanet.Types.Assets.FungibleAssetValue},System.Nullable{System.Int64},System.Nullable{System.DateTimeOffset})">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Types.Tx.Transaction"/> with custom actions and stage it.
+            It's available only if the genesis block exists.
+            </summary>
+            <param name="privateKey">A <see cref="T:Libplanet.Crypto.PrivateKey"/> of the account who creates and
+            signs a new transaction.</param>
+            <param name="actions">A list of custom actions to include to a new transaction.
+            </param>
+            <param name="maxGasPrice"> The maximum gas price this transaction can pay fee. </param>
+            <param name="gasLimit"> The maximum amount of gas this transaction can consume.
+            </param>
+            <param name="timestamp">The time this <see cref="T:Libplanet.Types.Tx.Transaction"/> is created and
+            signed.</param>
+            <returns>A created new <see cref="T:Libplanet.Types.Tx.Transaction"/> signed by the given
+            <paramref name="privateKey"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetStagedTransactionIds">
+            <summary>
+            Lists all staged <see cref="T:Libplanet.Types.Tx.TxId"/>s.
+            </summary>
+            <returns><see cref="T:System.Collections.Immutable.IImmutableSet`1"/> of staged transactions.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.FindNextHashes(Libplanet.Blockchain.BlockLocator,System.Nullable{Libplanet.Types.Blocks.BlockHash},System.Int32)">
+            <summary>
+            Finds the branch point <see cref="T:Libplanet.Types.Blocks.BlockHash"/> between this <see cref="T:Libplanet.Blockchain.BlockChain"/>
+            and <paramref name="locator"/> and returns the list of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es of
+            successive <see cref="T:Libplanet.Types.Blocks.Block"/>s starting from the branch point
+            <see cref="T:Libplanet.Types.Blocks.BlockHash"/>.</summary>
+            <param name="locator">The <see cref="T:Libplanet.Blockchain.BlockLocator"/> to find the branching point
+            from.</param>
+            <param name="stop">The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> to stop looking for subsequent blocks
+            once encountered.
+            </param>
+            <param name="count">The Maximum number of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es to return.</param>
+            <returns>A tuple of the index of the branch point and <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es
+            including the branch point <see cref="T:Libplanet.Types.Blocks.BlockHash"/>.  If no branch point is found,
+            returns a tuple of <see langword="null"/> and an empty array of
+            <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.Fork(Libplanet.Types.Blocks.BlockHash,System.Boolean)">
+            <summary>
+            Forks the chain at <paramref name="point"/> and returns the newly forked chain.
+            </summary>
+            <param name="point">The hash in which to fork from.</param>
+            <param name="inheritRenderers">Whether to inherit the renderers from the existing chain.
+            </param>
+            <returns>An instance of the newly forked chain.</returns>
+            <exception cref="T:System.ArgumentException">Throws when the provided <paramref name="point"/>
+            does not exist in the current chain.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetBlockLocator(System.Int32)">
+            <summary>
+            Returns a new <see cref="T:Libplanet.Blockchain.BlockLocator"/> from the tip of current chain.
+            </summary>
+            <param name="threshold">The amount of consequent blocks to include before sampling.
+            </param>
+            <returns>A instance of block locator.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetBlockCommit(System.Int64)">
+            <summary>
+            Returns a <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> of given <see cref="T:Libplanet.Types.Blocks.Block"/> index.
+            </summary>
+            <param name="index">A index value (height) of <see cref="T:Libplanet.Types.Blocks.Block"/> to retrieve.
+            </param>
+            <returns>Returns a <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> of given <see cref="T:Libplanet.Types.Blocks.Block"/> index.
+            Following conditions will return <see langword="null"/>:
+            <list type="bullet">
+                <item>
+                    Given <see cref="T:Libplanet.Types.Blocks.Block"/> <see cref="P:Libplanet.Types.Blocks.Block.ProtocolVersion"/> is
+                    Proof-of-Work.
+                </item>
+                <item>
+                    Given <see cref="T:Libplanet.Types.Blocks.Block"/> is <see cref="P:Libplanet.Blockchain.BlockChain.Genesis"/> block.
+                </item>
+            </list>
+            </returns>
+            <exception cref="T:System.Collections.Generic.KeyNotFoundException">Thrown if given index does not exist in the
+            blockchain.</exception>
+            <remarks>The <see cref="P:Libplanet.Blockchain.BlockChain.Genesis"/> block does not have
+            <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> because the genesis block is not committed by a consensus.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetBlockCommit(Libplanet.Types.Blocks.BlockHash)">
+            <summary>
+            Returns a <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> of given <see cref="T:Libplanet.Types.Blocks.Block"/> index.
+            </summary>
+            <param name="blockHash">A hash value of <see cref="T:Libplanet.Types.Blocks.Block"/> to retrieve.
+            </param>
+            <returns>Returns a <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> of given <see cref="T:Libplanet.Types.Blocks.Block"/> hash, if
+            the <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> of <see cref="P:Libplanet.Blockchain.BlockChain.Genesis"/> block is requested,
+            then returns <see langword="null"/>.</returns>
+            <exception cref="T:System.Collections.Generic.KeyNotFoundException">Thrown if given hash does not exist in the
+            blockchain.</exception>
+            <remarks>The <see cref="P:Libplanet.Blockchain.BlockChain.Genesis"/> block does not have
+            <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> because the genesis block is not committed by a consensus.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.FindBranchpoint(Libplanet.Blockchain.BlockLocator)">
+            <summary>
+            Find an approximate to the topmost common ancestor between this
+            <see cref="T:Libplanet.Blockchain.BlockChain"/> and a given <see cref="T:Libplanet.Blockchain.BlockLocator"/>.
+            </summary>
+            <param name="locator">A block locator that contains candidate common ancestors.</param>
+            <returns>An approximate to the topmost common ancestor.  If it failed to find anything
+            returns <see langword="null"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ListStagedTransactions(System.Collections.Generic.IComparer{Libplanet.Types.Tx.Transaction})">
+            <summary>
+            Lists the all staged transactions, with properly ordered nonces.
+            </summary>
+            <param name="txPriority">An optional comparer for give certain transactions to
+            priority to belong to the block.  No certain priority by default.</param>
+            <returns>A list of staged transactions.  This guarantees that for transactions signed
+            by the same address, those with greater nonce never comes before those with
+            lesser nonce.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.CleanupBlockCommitStore(System.Int64)">
+            <summary>
+            Cleans up every <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> in the store with
+            <see cref="P:Libplanet.Types.Blocks.BlockCommit.Height"/> less than <paramref name="limit"/>.
+            </summary>
+            <param name="limit">A exceptional index that is not to be removed.</param>
+            <exception cref="T:System.InvalidOperationException">Thrown when <see cref="P:Libplanet.Blockchain.BlockChain.IsCanonical"/> is
+            <see langword="false"/>.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.DetermineGenesisStateRootHash(Libplanet.Action.IActionEvaluator,Libplanet.Types.Blocks.IPreEvaluationBlock,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)">
+            <summary>
+            Determines the state root hash of <paramref name="preEvaluationBlock"/>
+            by evaluating on top of empty states.
+            </summary>
+            <param name="actionEvaluator">The <see cref="T:Libplanet.Action.IActionEvaluator"/> to use to
+            evaluate the proposed <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <param name="preEvaluationBlock">The <see cref="T:Libplanet.Types.Blocks.IPreEvaluationBlock"/> for which
+            to determine the state root hash.</param>
+            <param name="evaluations">The evaluation result from <see cref="M:Libplanet.Blockchain.BlockChain.EvaluateGenesis(Libplanet.Action.IActionEvaluator,Libplanet.Types.Blocks.IPreEvaluationBlock)"/>
+            for <paramref name="preEvaluationBlock"/>.</param>
+            <returns>The state root hash calculated by committing <paramref name="evaluations"/> to
+            an empty <see cref="T:Libplanet.Store.IStateStore"/>.</returns>
+            <remarks>
+            This method computes the state root hash by committing <paramref name="evaluations"/>
+            to an ephemeral empty <see cref="T:Libplanet.Store.IStateStore"/>.
+            </remarks>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.EvaluateGenesis(Libplanet.Action.IActionEvaluator,Libplanet.Types.Blocks.IPreEvaluationBlock)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.EvaluateGenesis(Libplanet.Action.IActionEvaluator,Libplanet.Types.Blocks.IPreEvaluationBlock)">
+            <summary>
+            Evaluates <paramref name="preEvaluationBlock"/> on top of empty states.
+            </summary>
+            <param name="actionEvaluator">The <see cref="T:Libplanet.Action.IActionEvaluator"/> to use to
+            evaluate the proposed <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <param name="preEvaluationBlock">The <see cref="T:Libplanet.Types.Blocks.IPreEvaluationBlock"/> to
+            evaluate.</param>
+            <returns>An <see cref="T:System.Collections.Generic.IReadOnlyList`1"/> of <see cref="T:Libplanet.Action.ICommittedActionEvaluation"/>s
+            resulting from evaluating <paramref name="preEvaluationBlock"/> using
+            <paramref name="actionEvaluator"/>.</returns>
+            <exception cref="T:System.ArgumentException">Thrown if <paramref name="preEvaluationBlock"/>s
+            <see cref="P:Libplanet.Types.Blocks.IBlockMetadata.Index"/> is not zero.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.DetermineBlockStateRootHash(Libplanet.Types.Blocks.IPreEvaluationBlock,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)">
+            <summary>
+            Determines the state root hash given <paramref name="block"/> and
+            <paramref name="evaluations"/>.
+            </summary>
+            <param name="block">The <see cref="T:Libplanet.Types.Blocks.IPreEvaluationBlock"/> to execute for
+            <paramref name="evaluations"/>.</param>
+            <param name="evaluations">The list of <see cref="T:Libplanet.Action.IActionEvaluation"/>s
+            from which to extract the states to commit.</param>
+            <exception cref="T:Libplanet.Action.InvalidActionException">Thrown when given <paramref name="block"/>
+            contains an action that cannot be loaded with <see cref="T:Libplanet.Action.Loader.IActionLoader"/>.</exception>
+            <returns>The state root hash given <paramref name="block"/> and
+            its <paramref name="evaluations"/>.
+            </returns>
+            <remarks>
+            Since the state root hash can only be calculated by making a commit
+            to an <see cref="T:Libplanet.Store.IStateStore"/>, this always has a side-effect to
+            <see cref="P:Libplanet.Blockchain.BlockChain.StateStore"/> regardless of whether the state root hash
+            obdatined through committing to <see cref="P:Libplanet.Blockchain.BlockChain.StateStore"/>
+            matches the <paramref name="block"/>'s <see cref="P:Libplanet.Types.Blocks.Block.StateRootHash"/> or not.
+            </remarks>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.EvaluateBlock(Libplanet.Types.Blocks.IPreEvaluationBlock)"/>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.ValidateBlockStateRootHash(Libplanet.Types.Blocks.Block,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.EvaluateBlock(Libplanet.Types.Blocks.IPreEvaluationBlock)">
+            <summary>
+            Evaluates the <see cref="T:Libplanet.Action.IAction"/>s in given <paramref name="block"/>.
+            </summary>
+            <param name="block">The <see cref="T:Libplanet.Types.Blocks.IPreEvaluationBlock"/> to execute.</param>
+            <returns>An <see cref="T:System.Collections.Generic.IReadOnlyList`1"/> of <ses cref="T:Libplanet.Action.ICommittedActionEvaluation"/>s
+            for given <paramref name="block"/>.</returns>
+            <exception cref="T:Libplanet.Action.InvalidActionException">Thrown when given <paramref name="block"/>
+            contains an action that cannot be loaded with <see cref="T:Libplanet.Action.Loader.IActionLoader"/>.</exception>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.ValidateBlockStateRootHash(Libplanet.Types.Blocks.Block,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.EvaluateAndSign(Libplanet.Types.Blocks.PreEvaluationBlock,Libplanet.Crypto.PrivateKey)">
+            <summary>
+            Evaluates all actions in the <see cref="P:Libplanet.Types.Blocks.PreEvaluationBlock.Transactions"/> and
+            an optional <see cref="P:Libplanet.Blockchain.Policies.IBlockPolicy.BlockAction"/>, and returns
+            a <see cref="T:Libplanet.Types.Blocks.Block"/> instance combined with the <see cref="P:Libplanet.Types.Blocks.Block.StateRootHash"/>
+            The returned <see cref="T:Libplanet.Types.Blocks.Block"/> is signed by the given <paramref name="privateKey"/>.
+            </summary>
+            <param name="preEvaluationBlock">The <see cref="T:Libplanet.Types.Blocks.PreEvaluationBlock"/> to evaluate
+            and sign.</param>
+            <param name="privateKey">The private key to be used for signing the block.
+            This must match to the block's <see cref="P:Libplanet.Types.Blocks.PreEvaluationBlockHeader.Miner"/> and
+            <see cref="P:Libplanet.Types.Blocks.PreEvaluationBlockHeader.PublicKey"/>.</param>
+            <returns>The block combined with the resulting <see cref="P:Libplanet.Types.Blocks.Block.StateRootHash"/>.
+            It is signed by the given <paramref name="privateKey"/>.</returns>
+            <exception cref="T:System.ArgumentException">Thrown when the block's
+            <see cref="P:Libplanet.Types.Blocks.PreEvaluationBlockHeader.ProtocolVersion"/> is less than 2.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when the given <paramref name="privateKey"/>
+            does not match to the block miner's <see cref="T:Libplanet.Crypto.PublicKey"/>.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ProposeGenesisBlock(Libplanet.Action.IActionEvaluator,Libplanet.Crypto.PrivateKey,System.Collections.Immutable.ImmutableList{Libplanet.Types.Tx.Transaction},System.Nullable{System.DateTimeOffset})">
+            <summary>
+            <para>
+            Propose a genesis block for creating a <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </para>
+            <para>
+            Note that a genesis <see cref="T:Libplanet.Types.Blocks.Block"/> produced may not be suitable as
+            a genesis for <see cref="M:Libplanet.Blockchain.BlockChain.Create(Libplanet.Blockchain.Policies.IBlockPolicy,Libplanet.Blockchain.Policies.IStagePolicy,Libplanet.Store.IStore,Libplanet.Store.IStateStore,Libplanet.Types.Blocks.Block,Libplanet.Action.IActionEvaluator,System.Collections.Generic.IEnumerable{Libplanet.Blockchain.Renderers.IRenderer},Libplanet.Action.State.IBlockChainStates)"/> if given
+            <paramref name="transactions"/> is invalid.
+            </para>
+            <para>
+            Make sure that the nonces for <paramref name="transactions"/> are correct and
+            each <see cref="P:Libplanet.Types.Tx.Transaction.GenesisHash"/> is set to <see langword="null"/>.
+            </para>
+            </summary>
+            <param name="actionEvaluator">The <see cref="T:Libplanet.Action.IActionEvaluator"/> to use to
+            evaluate the proposed <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <param name="privateKey">A private key to sign the transaction and the genesis block.
+            If it's null, it will use new private key as default.</param>
+            <param name="transactions">A list of <see cref="T:Libplanet.Types.Tx.Transaction"/>s to include
+            in the genesis <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <param name="timestamp">The timestamp of the genesis block.  If it's null, it will
+            use <see cref="P:System.DateTimeOffset.UtcNow"/> as default.</param>
+            <returns>A genesis <see cref="T:Libplanet.Types.Blocks.Block"/> proposed with given parameters.</returns>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.Create(Libplanet.Blockchain.Policies.IBlockPolicy,Libplanet.Blockchain.Policies.IStagePolicy,Libplanet.Store.IStore,Libplanet.Store.IStateStore,Libplanet.Types.Blocks.Block,Libplanet.Action.IActionEvaluator,System.Collections.Generic.IEnumerable{Libplanet.Blockchain.Renderers.IRenderer},Libplanet.Action.State.IBlockChainStates)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ProposeBlock(Libplanet.Crypto.PrivateKey,Libplanet.Types.Blocks.BlockCommit,System.Collections.Generic.IComparer{Libplanet.Types.Tx.Transaction})">
+            <summary>
+            <para>
+            Proposes a next <see cref="T:Libplanet.Types.Blocks.Block"/> using staged <see cref="T:Libplanet.Types.Tx.Transaction"/>s.
+            </para>
+            <para>
+            By default, if successful, a policy adhering <see cref="T:Libplanet.Types.Blocks.Block"/> is produced with
+            current timestamp that can be appended to the current chain.
+            </para>
+            </summary>
+            <param name="proposer">The proposer's <see cref="T:Libplanet.Crypto.PublicKey"/> that proposes the block.
+            </param>
+            <param name="lastCommit">The <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> evidence of the previous
+            <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <param name="txPriority">An optional comparer for give certain transactions to
+            priority to belong to the block.  No certain priority by default.</param>
+            <returns>A <see cref="T:Libplanet.Types.Blocks.Block"/> that is proposed.</returns>
+            <exception cref="T:System.OperationCanceledException">Thrown when
+            <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/> is changed while proposing.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ProposeBlock(Libplanet.Crypto.PrivateKey,System.Collections.Immutable.ImmutableList{Libplanet.Types.Tx.Transaction},Libplanet.Types.Blocks.BlockCommit)">
+            <summary>
+            <para>
+            Proposes a next <see cref="T:Libplanet.Types.Blocks.Block"/> using a specified
+            list of <see cref="T:Libplanet.Types.Tx.Transaction"/>s.
+            </para>
+            <para>
+            Unlike <see cref="M:Libplanet.Blockchain.BlockChain.ProposeBlock(Libplanet.Crypto.PrivateKey,Libplanet.Types.Blocks.BlockCommit,System.Collections.Generic.IComparer{Libplanet.Types.Tx.Transaction})"/>,
+            this may result in a <see cref="T:Libplanet.Types.Blocks.Block"/> that does not conform to the
+            <see cref="P:Libplanet.Blockchain.BlockChain.Policy"/>.
+            </para>
+            </summary>
+            <param name="proposer">The proposer's <see cref="T:Libplanet.Crypto.PublicKey"/> that proposes the block.
+            </param>
+            <param name="transactions">The list of <see cref="T:Libplanet.Types.Tx.Transaction"/>s to include.</param>
+            <param name="lastCommit">The <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> evidence of the previous
+            <see cref="T:Libplanet.Types.Blocks.Block"/>.</param>
+            <returns>A <see cref="T:Libplanet.Types.Blocks.Block"/> that is proposed.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GatherTransactionsToPropose(System.Int64,System.Collections.Generic.IComparer{Libplanet.Types.Tx.Transaction})">
+            <summary>
+            Gathers <see cref="T:Libplanet.Types.Tx.Transaction"/>s for proposing a <see cref="T:Libplanet.Types.Blocks.Block"/> for
+            index <pararef name="index"/>.  Gathered <see cref="T:Libplanet.Types.Tx.Transaction"/>s are
+            guaranteed to satisfied the following <see cref="T:Libplanet.Types.Tx.Transaction"/> related
+            policies:
+            <list type="bullet">
+                <item><description>
+                    <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsBytes(System.Int64)"/>
+                </description></item>
+                <item><description>
+                    <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerBlock(System.Int64)"/>
+                </description></item>
+                <item><description>
+                    <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerSignerPerBlock(System.Int64)"/>
+                </description></item>
+                <item><description>
+                    <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMinTransactionsPerBlock(System.Int64)"/>
+                </description></item>
+            </list>
+            </summary>
+            <param name="index">The index of the <see cref="T:Libplanet.Types.Blocks.Block"/> to propose.</param>
+            <param name="txPriority">An optional comparer for give certain transactions to
+            priority to belong to the block.  No certain priority by default.</param>
+            <returns>An <see cref="T:System.Collections.Immutable.ImmutableList"/> of <see cref="T:Libplanet.Types.Tx.Transaction"/>s
+            to propose.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when not all policies
+            can be satisfied.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GatherTransactionsToPropose(System.Int64,System.Int32,System.Int32,System.Int32,System.Collections.Generic.IComparer{Libplanet.Types.Tx.Transaction})">
+            <summary>
+            Gathers <see cref="T:Libplanet.Types.Tx.Transaction"/>s for proposing a next block
+            from the current set of staged <see cref="T:Libplanet.Types.Tx.Transaction"/>s.
+            </summary>
+            <param name="maxTransactionsBytes">The maximum number of bytes a block can have.</param>
+            <param name="maxTransactions">The maximum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s
+            allowed.</param>
+            <param name="maxTransactionsPerSigner">The maximum number of
+            <see cref="T:Libplanet.Types.Tx.Transaction"/>s with the same signer allowed.</param>
+            <param name="minTransactions">The minimum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s
+            allowed.</param>
+            <param name="txPriority">An optional comparer for give certain transactions to
+            priority to belong to the block.  No certain priority by default.</param>
+            <returns>An <see cref="T:System.Collections.Immutable.ImmutableList"/> of <see cref="T:Libplanet.Types.Tx.Transaction"/>s with its
+            count not exceeding <paramref name="maxTransactions"/> and the number of
+            <see cref="T:Libplanet.Types.Tx.Transaction"/>s in the list for each signer not exceeding
+            <paramref name="maxTransactionsPerSigner"/>.</returns>
+            <exception cref="T:System.InvalidOperationException">Thrown when not all policies
+            can be satisfied.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.RenderActions(System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation},Libplanet.Types.Blocks.Block)">
+            <summary>
+            Render actions of the given <paramref name="block"/>.
+            </summary>
+            <param name="evaluations"><see cref="T:Libplanet.Action.IActionEvaluation"/>s of the block.  If it is
+            <see langword="null"/>, evaluate actions of the <paramref name="block"/> again.</param>
+            <param name="block"><see cref="T:Libplanet.Types.Blocks.Block"/> to render actions.</param>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetRewindPath(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.BlockHash)">
+            <summary>
+            Generates a list of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es to traverse starting from
+            the tip of <paramref name="chain"/> to reach <paramref name="targetHash"/>.
+            </summary>
+            <param name="chain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> to traverse.</param>
+            <param name="targetHash">The target <see cref="T:Libplanet.Types.Blocks.BlockHash"/> to reach.</param>
+            <returns>
+            An <see cref="T:System.Collections.Generic.IReadOnlyList`1"/> of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es to traverse from
+            the tip of <paramref name="chain"/> to reach <paramref name="targetHash"/> excluding
+            <paramref name="targetHash"/>.
+            </returns>
+            <remarks>
+            <para>
+            This is a reverse of <see cref="M:Libplanet.Blockchain.BlockChain.GetFastForwardPath(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.BlockHash)"/>.
+            </para>
+            <para>
+            As the genesis is always fixed, returned results never include the genesis.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.GetFastForwardPath(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.BlockHash)">
+            <summary>
+            Generates a list of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es to traverse starting from
+            <paramref name="originHash"/> to reach the tip of <paramref name="chain"/>.
+            </summary>
+            <param name="chain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> to traverse.</param>
+            <param name="originHash">The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> to start from.</param>
+            <returns>
+            An <see cref="T:System.Collections.Generic.IReadOnlyList`1"/> of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es to traverse
+            to reach the tip of <paramref name="chain"/> from <paramref name="originHash"/>
+            excluding <paramref name="originHash"/>.
+            </returns>
+            <remarks>
+            This is a reverse of <see cref="M:Libplanet.Blockchain.BlockChain.GetRewindPath(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.BlockHash)"/>.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.FindTopCommon(Libplanet.Blockchain.BlockChain,Libplanet.Blockchain.BlockChain)">
+            <summary>
+            Finds the top most common <see cref="T:Libplanet.Types.Blocks.Block"/> between chains <paramref name="c1"/>
+            and <paramref name="c2"/>.
+            </summary>
+            <param name="c1">The first <see cref="T:Libplanet.Blockchain.BlockChain"/> to compare.</param>
+            <param name="c2">The second <see cref="T:Libplanet.Blockchain.BlockChain"/> to compare.</param>
+            <returns>
+            The top most common <see cref="T:Libplanet.Types.Blocks.Block"/> between chains <paramref name="c1"/>
+            and <paramref name="c2"/>. If there is no such <see cref="T:Libplanet.Types.Blocks.Block"/>,
+            returns <see langword="null"/> instead.
+            </returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.MakeTxExecutions(Libplanet.Types.Blocks.Block,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation})">
+            <summary>
+            Makes <see cref="T:Libplanet.Types.Tx.TxExecution"/> instances from the given <paramref name="evaluations"/>.
+            </summary>
+            <param name="block">The block that evaluated actions belong to.</param>
+            <param name="evaluations">The result of evaluated actions.</param>
+            <returns>The corresponding <see cref="T:Libplanet.Types.Tx.TxExecution"/>s.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ValidateGenesis(Libplanet.Types.Blocks.Block)">
+            <summary>
+            Checks if given <paramref name="block"/> is a valid genesis <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            </summary>
+            <param name="block">The target <see cref="T:Libplanet.Types.Blocks.Block"/> to validate.</param>
+            <exception cref="T:System.ArgumentException">If <paramref name="block"/> has
+            <see cref="P:Libplanet.Types.Blocks.Block.Index"/> value anything other than 0.</exception>
+            <exception cref="T:Libplanet.Types.Blocks.InvalidBlockException">Thrown when given <paramref name="block"/>
+            is invalid.</exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChain.ValidateBlockStateRootHash(Libplanet.Types.Blocks.Block,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)">
+            <summary>
+            Validates a result obtained from <see cref="M:Libplanet.Blockchain.BlockChain.EvaluateBlock(Libplanet.Types.Blocks.IPreEvaluationBlock)"/> by
+            comparing the state root hash calculated using <see cref="M:Libplanet.Blockchain.BlockChain.DetermineBlockStateRootHash(Libplanet.Types.Blocks.IPreEvaluationBlock,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)"/>
+            to the one in <paramref name="block"/>.
+            </summary>
+            <param name="block">The <see cref="T:Libplanet.Types.Blocks.Block"/> to validate against.</param>
+            <param name="evaluations">The list of <see cref="T:Libplanet.Action.IActionEvaluation"/>s
+            from which to extract the states to commit.</param>
+            <exception cref="T:Libplanet.Types.Blocks.InvalidBlockStateRootHashException">If the state root hash
+            calculated by committing to the <see cref="T:Libplanet.Store.IStateStore"/> does not match
+            the <paramref name="block"/>'s <see cref="P:Libplanet.Types.Blocks.Block.StateRootHash"/>.</exception>
+            <remarks>
+            Since the state root hash for can only be calculated from making a commit
+            to an <see cref="T:Libplanet.Store.IStateStore"/>, this always has a side-effect to the
+            <see cref="T:Libplanet.Store.IStateStore"/> regardless of whether the state root hash
+            obdatined through committing to the <see cref="T:Libplanet.Store.IStateStore"/>
+            matches the <paramref name="block"/>'s <see cref="P:Libplanet.Types.Blocks.Block.StateRootHash"/> or not.
+            </remarks>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.EvaluateBlock(Libplanet.Types.Blocks.IPreEvaluationBlock)"/>
+            <seealso cref="M:Libplanet.Blockchain.BlockChain.DetermineBlockStateRootHash(Libplanet.Types.Blocks.IPreEvaluationBlock,System.Collections.Generic.IReadOnlyList{Libplanet.Action.ICommittedActionEvaluation}@)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.BlockChainStates">
+            <summary>
+            A default implementation of <see cref="T:Libplanet.Action.State.IBlockChainStates" /> interface.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetState(Libplanet.Crypto.Address,System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetState(Libplanet.Crypto.Address,System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetStates(System.Collections.Generic.IReadOnlyList{Libplanet.Crypto.Address},System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetStates(System.Collections.Generic.IReadOnlyList{Libplanet.Crypto.Address},System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetBalance(Libplanet.Crypto.Address,Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetBalance(Libplanet.Crypto.Address,Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetTotalSupply(Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetTotalSupply(Libplanet.Types.Assets.Currency,System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetValidatorSet(System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetValidatorSet(System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetAccountState(System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetAccountState(System.Nullable{Libplanet.Types.Blocks.BlockHash})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetAccountState(System.Nullable{Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256}})">
+            <inheritdoc cref="M:Libplanet.Action.State.IBlockChainStates.GetAccountState(System.Nullable{Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256}})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockChainStates.GetTrie(System.Nullable{Libplanet.Types.Blocks.BlockHash})">
+            <summary>
+            Returns the state root associated with <see cref="T:Libplanet.Types.Blocks.BlockHash"/>
+            <paramref name="offset"/>.
+            </summary>
+            <param name="offset">The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> to look up in
+            the internally held <see cref="T:Libplanet.Store.IStore"/>.</param>
+            <returns>An <see cref="T:Libplanet.Store.Trie.ITrie"/> representing the state root associated with
+            <paramref name="offset"/>.</returns>
+            <exception cref="T:System.ArgumentException">Thrown for one of the following reasons.
+            <list type="bullet">
+                <item><description>
+                    If <paramref name="offset"/> is not <see langword="null"/> and
+                    <paramref name="offset"/> cannot be found in <see cref="T:Libplanet.Store.IStore"/>.
+                </description></item>
+                <item><description>
+                    If <paramref name="offset"/> is not <see langword="null"/> and
+                    the state root hash associated with <paramref name="offset"/>
+                    cannot be found in <see cref="T:Libplanet.Store.IStateStore"/>.
+                </description></item>
+            </list>
+            </exception>
+            <remarks>
+            An <see cref="T:Libplanet.Store.Trie.ITrie"/> returned by this method is read-only.
+            </remarks>
+        </member>
+        <member name="T:Libplanet.Blockchain.BlockLocator">
+            <summary>
+            A class that contains <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es for a series of blocks.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockLocator.#ctor(System.Collections.Generic.IEnumerable{Libplanet.Types.Blocks.BlockHash})">
+            <summary>
+            Initializes a new instance of <see cref="T:Libplanet.Blockchain.BlockLocator"/> from <paramref name="hashes"/>.
+            </summary>
+            <param name="hashes">Enumerable of <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es to convert from.</param>
+            <exception cref="T:System.ArgumentException">Thrown when <paramref name="hashes"/> is empty.
+            </exception>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockLocator.Create(System.Int64,System.Func{System.Int64,System.Nullable{Libplanet.Types.Blocks.BlockHash}},System.Int64)">
+            <summary>
+            <para>
+            Creates a new instance of <see cref="T:Libplanet.Blockchain.BlockLocator"/> with an indexer
+            function, sampling after <paramref name="sampleAfter"/> number of
+            <see cref="T:Libplanet.Types.Blocks.Block"/>s.
+            </para>
+            <para>
+            This collects all <see cref="T:Libplanet.Types.Blocks.BlockHash"/>es corresponding to indices inductively
+            defined by:
+            <list type="bullet">
+              <item><description>
+                <c>i_0 = startIndex</c>
+              </description></item>
+              <item><description>
+                <c>i_k = max(i_(k - 1) - 1, 0)</c> for <c>0 &lt; k</c> and  <c>k &lt;= s</c>
+              </description></item>
+              <item><description>
+                <c>i_k = max(i_(k - 1) - 2^(k - 1 - s), 0)</c> for <c>0 &lt; k</c>
+                and <c>s &lt; k</c>
+              </description></item>
+            </list>
+            where <c>s = max(sampleAfter, 0)</c> and the sequence terminates after index <c>i_k</c>
+            reaches zero or the <see cref="T:Libplanet.Types.Blocks.BlockHash"/> returned by
+            <paramref name="indexToBlockHash"/> for <c>i_k</c> is <see langword="null"/>,
+            in which case the <see cref="T:Libplanet.Types.Blocks.BlockHash"/> corresponding to index <c>0</c>
+            (presumably a <see cref="T:Libplanet.Types.Blocks.BlockHash"/> of the genesis <see cref="T:Libplanet.Types.Blocks.Block"/>)
+            is added at the end.
+            </para>
+            </summary>
+            <param name="startIndex">The starting index.</param>
+            <param name="indexToBlockHash">The function that converts an index to a
+            <see cref="T:Libplanet.Types.Blocks.BlockHash"/>.  This can be <see langword="null"/> which indicates
+            a missing <see cref="T:Libplanet.Types.Blocks.Block"/> at the index.  Any value from <c>0</c> to
+            <paramref name="startIndex"/> may be used as an argument to call this function.</param>
+            <param name="sampleAfter">The number of consecutive blocks to include before sampling.
+            </param>
+            <exception cref="T:System.ArgumentOutOfRangeException">Thrown when <paramref name="startIndex"/>
+            is negative.</exception>
+            <exception cref="T:System.ArgumentException">Thrown when either <see cref="T:Libplanet.Types.Blocks.BlockHash"/> returned
+            by <paramref name="indexToBlockHash"/> for index <c>0</c> is <see langword="null"/>.
+            </exception>
+            <returns>
+            An instance of <see cref="T:Libplanet.Blockchain.BlockLocator"/> created with given arguments.
+            </returns>
+            <remarks>
+            Returned <see cref="T:Libplanet.Blockchain.BlockLocator"/> created by this factory method is guaranteed
+            to have the <see cref="T:Libplanet.Types.Blocks.BlockHash"/> corresponding to index <c>0</c>.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.BlockLocator.GetEnumerator">
+            <summary>
+            Gets the enumerator.
+            </summary>
+            <returns>The enumerator.</returns>
+        </member>
+        <member name="T:Libplanet.Blockchain.Branch">
+            <summary>
+            A class representing a consecutive list of <see cref="T:Libplanet.Types.Blocks.Block"/>s.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Branch.#ctor(System.Collections.Generic.IEnumerable{System.ValueTuple{Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.BlockCommit}})">
+            <summary>
+            Initializes a new instance of <see cref="T:Libplanet.Blockchain.Branch"/> from <paramref name="blocks"/>.
+            </summary>
+            <param name="blocks">An enumerable of <see cref="T:Libplanet.Types.Blocks.Block"/> and
+            <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> pairs to convert from.</param>
+            <exception cref="T:System.ArgumentException">Thrown for failing to satisfy any of the following:
+            <list type="bullet">
+                <item><description>
+                    Given <paramref name="blocks"/> is non-empty.
+                </description></item>
+                <item><description>
+                    Given <paramref name="blocks"/> are consecutive in the sense that indices
+                    are unique, consecutive, and every <see cref="P:Libplanet.Types.Blocks.Block.PreviousHash"/> match
+                    the <see cref="P:Libplanet.Types.Blocks.Block.Hash"/> of the previous <see cref="T:Libplanet.Types.Blocks.Block"/>.
+                </description></item>
+            </list>
+            </exception>
+        </member>
+        <member name="P:Libplanet.Blockchain.Branch.Blocks">
+            <summary>
+            An <see cref="T:System.Collections.Immutable.ImmutableArray`1"/> of <see cref="T:Libplanet.Types.Blocks.Block"/> and
+            <see cref="T:Libplanet.Types.Blocks.BlockCommit"/> pairs guaranteed to satisfy
+            the following properties:
+            <list type="bullet">
+                <item><description>
+                    The collection is non-empty.
+                </description></item>
+                <item><description>
+                    The collection is sorted by index.
+                </description></item>
+                <item><description>
+                    The elements are consecutive in the sense that indices
+                    are unique, consecutive, and every <see cref="P:Libplanet.Types.Blocks.Block.PreviousHash"/> match
+                    the <see cref="P:Libplanet.Types.Blocks.Block.Hash"/> of the previous <see cref="T:Libplanet.Types.Blocks.Block"/>.
+                </description></item>
+            </list>
+            </summary>
+        </member>
+        <member name="T:Libplanet.Blockchain.Policies.BlockPolicy">
+            <summary>
+            A default implementation of <see cref="T:Libplanet.Blockchain.Policies.IBlockPolicy"/> interface.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.#ctor(Libplanet.Action.IAction,System.Nullable{System.TimeSpan},System.Func{Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction,Libplanet.Types.Tx.TxPolicyViolationException},System.Func{Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.BlockPolicyViolationException},System.Func{System.Int64,System.Int64},System.Func{System.Int64,System.Int32},System.Func{System.Int64,System.Int32},System.Func{System.Int64,System.Int32})">
+            <summary>
+            <para>
+            Creates a default <see cref="T:Libplanet.Blockchain.Policies.BlockPolicy"/> instance.
+            </para>
+            <para>
+            Each unprovided argument will be assigned a default value.  See each parameter
+            description for more detail.
+            </para>
+            </summary>
+            <param name="blockAction">A <see cref="T:Libplanet.Action.IAction"/> to executed for
+            every <see cref="T:Libplanet.Types.Blocks.Block"/>.  Set to <see langword="null"/> by default, which results
+            in no additional execution other than those included in <see cref="T:Libplanet.Types.Tx.Transaction"/>s.
+            </param>
+            <param name="blockInterval">Goes to <see cref="P:Libplanet.Blockchain.Policies.BlockPolicy.BlockInterval"/>.
+            Set to <see cref="F:Libplanet.Blockchain.Policies.BlockPolicy.DefaultTargetBlockInterval"/> by default.
+            </param>
+            <param name="validateNextBlockTx">The predicate that determines if
+            a <see cref="T:Libplanet.Types.Tx.Transaction"/> follows the policy.  Set to a constant function of
+            <see langword="null"/> by default.</param>
+            <param name="validateNextBlock">The predicate that determines if
+            a <see cref="T:Libplanet.Types.Blocks.Block"/> follows the policy.  Set to a default implementation
+            where block's hash algorithm type, bytes count, and transactions count are validated.
+            </param>
+            <param name="getMaxTransactionsBytes">The function determining the maximum size of
+            <see cref="P:Libplanet.Types.Blocks.Block.Transactions"/> in number of <c>byte</c>s given
+            its <see cref="P:Libplanet.Types.Blocks.Block.Index"/>.  Goes to <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsBytes(System.Int64)"/>.
+            Set to a constant size of <c>100</c>KiB, i.e. <c>100 * 1024</c>, by default.</param>
+            <param name="getMinTransactionsPerBlock">The function determining the minimum number of
+            <see cref="T:Libplanet.Types.Tx.Transaction"/>s that must be included in a <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            Goes to <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMinTransactionsPerBlock(System.Int64)"/>.  Set to a constant function
+            of <c>0</c> by default.</param>
+            <param name="getMaxTransactionsPerBlock">The function determining how many
+            <see cref="T:Libplanet.Types.Tx.Transaction"/>s can be included in a <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            Goes to <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerBlock(System.Int64)"/>.  Set to a constant function
+            of <c>100</c> by default.</param>
+            <param name="getMaxTransactionsPerSignerPerBlock">The function determining the maximum
+            number of transactions from the same signer that can be included in
+            a <see cref="T:Libplanet.Types.Blocks.Block"/> given the <see cref="T:Libplanet.Types.Blocks.Block"/>'s index.
+            Goes to <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerSignerPerBlock(System.Int64)"/>.  Set to
+            <see cref="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerBlock(System.Int64)"/> by default.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Policies.BlockPolicy.BlockAction">
+            <inheritdoc/>
+        </member>
+        <member name="P:Libplanet.Blockchain.Policies.BlockPolicy.BlockInterval">
+            <summary>
+            Targeted time interval between two consecutive <see cref="T:Libplanet.Types.Blocks.Block"/>s.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.ValidateNextBlockTx(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.ValidateNextBlock(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.Block)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsBytes(System.Int64)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMinTransactionsPerBlock(System.Int64)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerBlock(System.Int64)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.BlockPolicy.GetMaxTransactionsPerSignerPerBlock(System.Int64)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Policies.IBlockPolicy">
+            <summary>
+            <para>
+            An interface to determine if consecutive <see cref="T:Libplanet.Types.Blocks.Block"/>s are valid.
+            </para>
+            <para>
+            An implementation of this interface should perform <em>all policy dependent checks</em>,
+            such as whether a <see cref="T:Libplanet.Types.Blocks.Block"/> has the right difficulty,
+            a <see cref="T:Libplanet.Types.Tx.Transaction"/> has the right signer, etc.
+            </para>
+            <para>
+            Note that all index dependent sub-policies are ignored for genesis <see cref="T:Libplanet.Types.Blocks.Block"/>s.
+            </para>
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Policies.IBlockPolicy.BlockAction">
+            <summary>
+            An <see cref="T:Libplanet.Action.IAction"/> to execute and be rendered for every block, if any.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IBlockPolicy.ValidateNextBlockTx(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction)">
+            <summary>
+            Checks if a <see cref="T:Libplanet.Types.Tx.Transaction"/> can be included in a yet to be mined
+            <see cref="T:Libplanet.Types.Blocks.Block"/> that can be appended to the given <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+            <param name="blockChain">The target <see cref="T:Libplanet.Blockchain.BlockChain"/> to include
+            given <paramref name="transaction"/>.</param>
+            <param name="transaction">The <see cref="T:Libplanet.Types.Tx.Transaction"/> to consider.</param>
+            <returns>A <see cref="T:Libplanet.Types.Tx.TxPolicyViolationException"/> with a description
+            as to why given <paramref name="transaction"/> is <em>invalid</em>,
+            or <see langword="null"/> if <paramref name="transaction"/> is <em>valid</em>.</returns>
+            <remarks>
+            This is used in two different cases:
+            <list type="bullet">
+            <item>
+                <description>When selecting which <see cref="T:Libplanet.Types.Tx.Transaction"/> to include
+                when mining a next <see cref="T:Libplanet.Types.Blocks.Block"/>.</description>
+            </item>
+            <item>
+                <description>When appending a <see cref="T:Libplanet.Types.Blocks.Block"/>
+                with <paramref name="transaction"/> to a <see cref="T:Libplanet.Blockchain.BlockChain"/>.</description>
+            </item>
+            </list>
+            This is called separately from <see cref="M:Libplanet.Blockchain.Policies.IBlockPolicy.ValidateNextBlock(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.Block)"/> from
+            a <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IBlockPolicy.ValidateNextBlock(Libplanet.Blockchain.BlockChain,Libplanet.Types.Blocks.Block)">
+            <summary>
+            Checks if a <see cref="T:Libplanet.Types.Blocks.Block"/> can be appended to
+            the given <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            </summary>
+            <param name="blockChain">The target <see cref="T:Libplanet.Blockchain.BlockChain"/> to
+            append <paramref name="nextBlock"/>.</param>
+            <param name="nextBlock">The next block to append to
+            <paramref name="blockChain"/>.</param>
+            <returns>A <see cref="T:Libplanet.Types.Blocks.BlockPolicyViolationException"/> with a description
+            as to why given <paramref name="nextBlock"/> is <em>invalid</em>,
+            or <see langword="null"/> if <paramref name="nextBlock"/> is <em>valid</em>.</returns>
+            <remarks>
+            Note that <see cref="M:Libplanet.Blockchain.Policies.IBlockPolicy.ValidateNextBlockTx(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction)"/> will be called separately from
+            a <see cref="T:Libplanet.Blockchain.BlockChain"/> when appending a <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            Hence, to reduce redundancy, an implementation of this interface should not
+            call <see cref="M:Libplanet.Blockchain.Policies.IBlockPolicy.ValidateNextBlockTx(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction)"/>.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IBlockPolicy.GetMaxTransactionsBytes(System.Int64)">
+            <summary>
+            Gets the maximum length of <see cref="P:Libplanet.Types.Blocks.Block.Transactions"/> in bytes.
+            </summary>
+            <param name="index">The <see cref="P:Libplanet.Types.Blocks.Block.Index"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/>
+            for which this constraint should apply.</param>
+            <returns>The maximum length of <see cref="P:Libplanet.Types.Blocks.Block.Transactions"/> in bytes
+            to accept.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IBlockPolicy.GetMinTransactionsPerBlock(System.Int64)">
+            <summary>
+            Gets the minimum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s allowed for
+            a valid <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            </summary>
+            <param name="index">The <see cref="P:Libplanet.Types.Blocks.Block.Index"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/>
+            for which this constraint should apply.</param>
+            <returns>The minimum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s allowed for
+            a valid <see cref="T:Libplanet.Types.Blocks.Block"/> can accept.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IBlockPolicy.GetMaxTransactionsPerBlock(System.Int64)">
+            <summary>
+            Gets the maximum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s allowed for
+            a valid <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            </summary>
+            <param name="index">The <see cref="P:Libplanet.Types.Blocks.Block.Index"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/>
+            for which this constraint should apply.</param>
+            <returns>The maximum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s allowed for
+            a valid <see cref="T:Libplanet.Types.Blocks.Block"/> can accept.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IBlockPolicy.GetMaxTransactionsPerSignerPerBlock(System.Int64)">
+            <summary>
+            Gets the maximum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s allowed per signer for
+            a valid <see cref="T:Libplanet.Types.Blocks.Block"/>.
+            </summary>
+            <param name="index">The <see cref="P:Libplanet.Types.Blocks.Block.Index"/> of the <see cref="T:Libplanet.Types.Blocks.Block"/>
+            for which this constraint should apply.</param>
+            <returns>The maximum number of <see cref="T:Libplanet.Types.Tx.Transaction"/>s allowed per signer for
+            a valid <see cref="T:Libplanet.Types.Blocks.Block"/> can accept.</returns>
+        </member>
+        <member name="T:Libplanet.Blockchain.Policies.IStagePolicy">
+            <summary>
+            An interface to configure a <see cref="T:Libplanet.Blockchain.BlockChain"/>'s strategy to deal with staged
+            transactions.
+            </summary>
+            <remarks>
+            Every operation of an implementation of this <c>interface</c> must be thread-safe.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.Stage(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction)">
+            <summary>
+            Stages a <paramref name="transaction"/>.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="transaction">The <seealso cref="T:Libplanet.Types.Tx.Transaction"/> to be staged.</param>
+            <returns><see langword="true"/> if staging was successful,
+            <see langword="false"/> otherwise.</returns>
+            <remarks>
+            <para>
+            This does not throw any exception regardless of whether <paramref name="transaction"/>
+            was successfully staged or not.
+            </para>
+            <para>
+            If the <see cref="P:Libplanet.Types.Tx.Transaction.Id"/> of <paramref name="transaction"/> is marked
+            as ignored, <paramref name="transaction"/> will not be staged.
+            </para>
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.Unstage(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId)">
+            <summary>
+            Unstages a transaction <paramref name="id"/>.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="id">The <seealso cref="P:Libplanet.Types.Tx.Transaction.Id"/> to unstage.</param>
+            <returns><see langword="true"/> if unstaging was successful,
+            <see langword="false"/> otherwise.</returns>
+            <remarks>
+            This does not throw any exception regardless of whether <paramref name="id"/> was
+            successfully unstaged or not.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.Ignore(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId)">
+            <summary>
+            Marks given <paramref name="id"/> as ignored.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="id">The <see cref="P:Libplanet.Types.Tx.Transaction.Id"/> to ignore.</param>
+            <remarks>
+            If the <see cref="T:Libplanet.Types.Tx.Transaction"/> associated with <paramref name="id"/> is already
+            staged, this also unstages the <see cref="T:Libplanet.Types.Tx.Transaction"/>.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.Ignores(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId)">
+            <summary>
+            Checks if given <paramref name="id"/> is marked as ignored.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="id">The <see cref="P:Libplanet.Types.Tx.Transaction.Id"/> to check.</param>
+            <returns><see langword="true"/> if <paramref name="id"/> is marked as ignored,
+            <see langword="false"/> otherwise.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.Get(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId,System.Boolean)">
+            <summary>
+            Retrieves a staged <see cref="T:Libplanet.Types.Tx.Transaction"/> by its <paramref name="id"/>.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="id">The <see cref="P:Libplanet.Types.Tx.Transaction.Id"/> to get.</param>
+            <param name="filtered">Whether to filter masked staged <see cref="T:Libplanet.Types.Tx.Transaction"/>s
+            or not.  Set to <see langword="true"/> by default.</param>
+            <returns>The staged <see cref="T:Libplanet.Types.Tx.Transaction"/> associated with <paramref name="id"/>
+            if found,  <see langword="null"/> otherwise.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.Iterate(Libplanet.Blockchain.BlockChain,System.Boolean)">
+            <summary>
+            Enumerates all staged <see cref="T:Libplanet.Types.Tx.Transaction"/>s.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="filtered">Whether to filter masked staged <see cref="T:Libplanet.Types.Tx.Transaction"/>s
+            or not.  Set to <see langword="true"/> by default.</param>
+            <returns>All staged transactions.  No ordering is guaranteed.</returns>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.IStagePolicy.GetNextTxNonce(Libplanet.Blockchain.BlockChain,Libplanet.Crypto.Address)">
+            <summary>
+            Calculates the next nonce according for given <paramref name="address"/>.
+            </summary>
+            <param name="blockChain">The <see cref="T:Libplanet.Blockchain.BlockChain"/> that the stage belongs to.
+            </param>
+            <param name="address">The <see cref="T:Libplanet.Crypto.Address"/> to calculate the next nonce for.
+            </param>
+            <returns>The next appropriate nonce for <paramref name="address"/>.</returns>
+        </member>
+        <member name="T:Libplanet.Blockchain.Policies.VolatileStagePolicy">
+            <summary>
+            <para>
+            An in memory implementation of the <see cref="T:Libplanet.Blockchain.Policies.IStagePolicy"/>.
+            </para>
+            <para>
+            This implementation holds on to every unconfirmed <see cref="T:Libplanet.Types.Tx.Transaction"/> except
+            for the following reasons:
+            <list type="bullet">
+                <item>
+                    <description>A <see cref="T:Libplanet.Types.Tx.Transaction"/> has been specifically marked to
+                    be ignored due to <see cref="T:Libplanet.Types.Tx.Transaction"/> not being valid.</description>
+                </item>
+                <item>
+                    <description>A <see cref="T:Libplanet.Types.Tx.Transaction"/> has expired due to its staleness.
+                    </description>
+                </item>
+            </list>
+            </para>
+            <para>
+            Additionally, any <see cref="T:Libplanet.Types.Tx.Transaction"/> with a lower nonce than that of returned by
+            the <see cref="T:Libplanet.Blockchain.BlockChain"/> is masked and filtered by default.
+            </para>
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.#ctor">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Policies.VolatileStagePolicy"/> instance.
+            By default, <see cref="P:Libplanet.Blockchain.Policies.VolatileStagePolicy.Lifetime"/> is set to 10 minutes.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.#ctor(System.TimeSpan)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Policies.VolatileStagePolicy"/> instance.
+            </summary>
+            <param name="lifetime">Volatilizes staged transactions older than this
+            <see cref="T:System.TimeSpan"/>.  See also <see cref="P:Libplanet.Blockchain.Policies.VolatileStagePolicy.Lifetime"/>.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Policies.VolatileStagePolicy.Lifetime">
+            <summary>
+            Lifespan for <see cref="T:Libplanet.Types.Tx.Transaction"/>s.  Any <see cref="T:Libplanet.Types.Tx.Transaction"/> older
+            than this <see cref="T:System.TimeSpan"/> will be considered expired.
+            </summary>
+            <remarks>
+            Expired <see cref="T:Libplanet.Types.Tx.Transaction"/>s cannot be staged.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.Stage(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.Transaction)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.Unstage(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.Ignore(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.Ignores(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.Get(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.Iterate(Libplanet.Blockchain.BlockChain,System.Boolean)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.GetNextTxNonce(Libplanet.Blockchain.BlockChain,Libplanet.Crypto.Address)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Policies.VolatileStagePolicy.GetInner(Libplanet.Blockchain.BlockChain,Libplanet.Types.Tx.TxId,System.Boolean)">
+            <remarks>
+            It has been intended to avoid recursive lock, hence doesn't hold any synchronous scope.
+            Therefore, we should manage the lock from its caller side.
+            </remarks>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.AnonymousActionRenderer">
+            <summary>
+            An <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> that invokes its callbacks.
+            In other words, this is an <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> version of
+            <see cref="T:Libplanet.Blockchain.Renderers.AnonymousRenderer"/>.
+            <para>This class is useful when you want an one-use ad-hoc implementation (i.e., Java-style
+            anonymous class) of <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> interface.</para>
+            </summary>
+            <example>
+            With object initializers, you can easily make an one-use action renderer:
+            <code><![CDATA[
+            var actionRenderer = new AnonymousActionRenderer
+            {
+                ActionRenderer = (action, context, nextState) =>
+                {
+                    // Implement RenderAction() here.
+                };
+            };
+            ]]></code>
+            </example>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.ActionRenderer">
+            <summary>
+            A callback function to be invoked together with
+            <see cref="M:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.ActionErrorRenderer">
+            <summary>
+            A callback function to be invoked together with
+            <see cref="M:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.BlockEndRenderer">
+            <summary>
+            A callback function to be invoked together with
+            <see cref="M:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)">
+            <inheritdoc
+            cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AnonymousActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.AnonymousRenderer">
+            <summary>
+            A renderer that invokes its callbacks.
+            <para>This class is useful when you want an one-use ad-hoc implementation (i.e., Java-style
+            anonymous class) of <see cref="T:Libplanet.Blockchain.Renderers.IRenderer"/> interface.</para>
+            </summary>
+            <example>
+            With object initializers, you can easily make an one-use renderer:
+            <code>
+            var renderer = new AnonymousRenderer;
+            {
+                BlockRenderer = (oldTip, newTip) =>
+                {
+                    // Implement RenderBlock() here.
+                };
+            };
+            </code>
+            </example>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.AnonymousRenderer.BlockRenderer">
+            <summary>
+            A callback function to be invoked together with
+            <see cref="M:Libplanet.Blockchain.Renderers.AnonymousRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AnonymousRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.AtomicActionRenderer">
+            <summary>
+            A middleware to make action render events to satisfy transactions' atomicity.
+            <para>Decorates an <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> instance and filters out render events
+            made by unsuccessful transactions (i.e., transactions with one or more exception-throwing
+            actions).</para>
+            </summary>
+            <remarks>The wrapped <see cref="P:Libplanet.Blockchain.Renderers.AtomicActionRenderer.ActionRenderer"/> will not receive any
+            <see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/> events except for block actions,
+            which do not belong to any transactions.
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.#ctor(Libplanet.Blockchain.Renderers.IActionRenderer)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Renderers.AtomicActionRenderer"/> instance decorating the given
+            <paramref name="actionRenderer"/>.
+            </summary>
+            <param name="actionRenderer">The inner action renderer which has the <em>actual</em>
+            implementations and expects to receive no <see cref="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/> events.
+            </param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.AtomicActionRenderer.ActionRenderer">
+            <summary>
+            The inner action renderer which has the <em>actual</em> implementations and expects to
+            receive no <see cref="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/> events.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.AtomicActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.InvalidRenderException">
+            <summary>
+            Exception thrown by <see cref="T:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.InvalidRenderException.#ctor(System.String,System.Collections.Generic.IReadOnlyList{Libplanet.Blockchain.Renderers.Debug.RenderRecord})">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer"/> instance.
+            </summary>
+            <param name="message">The exception message string.</param>
+            <param name="records">Recorded render events.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.InvalidRenderException.Records">
+            <summary>
+            Recorded render events.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.InvalidRenderException.Message">
+            <inheritdoc cref="P:System.Exception.Message"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer">
+            <summary>
+            Records every render events.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.#ctor">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer"/> instance.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.Records">
+            <summary>
+            The list of recorded render events.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.ResetRecords">
+            <summary>
+            Empties the render event <see cref="P:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.Records"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RenderRecord">
+            <summary>
+            A render event represented by <see cref="T:Libplanet.Blockchain.Renderers.Debug.RecordingActionRenderer"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.Index">
+            <summary>
+            The ordinal number of the render event.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.StackTrace">
+            <summary>
+            The stack trace of the render event.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ToString">
+            <inheritdoc cref="M:System.Object.ToString"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionBase">
+            <summary>
+            Represents an action render/unrender event.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionBase.Action">
+            <summary>
+            The rendered action.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionBase.Context">
+            <summary>
+            The action evaluation context.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionBase.Render">
+            <summary>
+            Whether it is not an unrender event, but a render event.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionBase.Unrender">
+            <summary>
+            Whether it is a render event, but an unrender event.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionBase.ToString">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ToString"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionSuccess">
+            <summary>
+            Represents a succeeded action render/unrender event.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionSuccess.#ctor(System.Int64,System.String,Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256},System.Boolean)">
+            <summary>
+            Creates a succeeded action render/unrender event record.
+            </summary>
+            <param name="index">The ordinal number of the render event.</param>
+            <param name="stackTrace">The stack trace of the render event.</param>
+            <param name="action">The rendered action.</param>
+            <param name="context">The action evaluation context.</param>
+            <param name="nextState">The resulting state after the action is evaluated.</param>
+            <param name="unrender">Whether it is an unrender event.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionSuccess.NextState">
+            <summary>
+            The resulting states after the action is evaluated.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionSuccess.ToString">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ToString"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionError">
+            <summary>
+            Represents a failed action render/unrender event.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionError.#ctor(System.Int64,System.String,Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception,System.Boolean)">
+            <summary>
+            Creates a failed action render/unrender event record.
+            </summary>
+            <param name="index">The ordinal number of the render event.</param>
+            <param name="stackTrace">The stack trace of the render event.</param>
+            <param name="action">The rendered action.</param>
+            <param name="context">The action evaluation context.</param>
+            <param name="exception">The exception thrown by the action.</param>
+            <param name="unrender">Whether it is an unrender event.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionError.Exception">
+            <summary>
+            The exception thrown by the action.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ActionError.ToString">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ToString"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockBase">
+            <summary>
+            Represents a block event.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockBase.OldTip">
+            <summary>
+            The tip before update.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockBase.NewTip">
+            <summary>
+            The tip after update.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockBase.Begin">
+            <summary>
+            Whether it is not an <c>End</c> event.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockBase.End">
+            <summary>
+            Whether it is an <c>End</c> event.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockBase.ToString">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ToString"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockEvent">
+            <summary>
+            Represents a block event.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockEvent.#ctor(System.Int64,System.String,Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block,System.Boolean)">
+            <summary>
+            Creates a block event record.
+            </summary>
+            <param name="index">The ordinal number of the render event.</param>
+            <param name="stackTrace">The stack trace of the render event.</param>
+            <param name="oldTip">The tip before update.</param>
+            <param name="newTip">The tip after update.</param>
+            <param name="end">Whether it is an <c>End</c> event.</param>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.BlockEvent.ToString">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.Debug.RenderRecord.ToString"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer">
+            <summary>
+            Validates if rendering events are in the correct order according to the documented automata
+            (see also the docs for <see cref="T:Libplanet.Blockchain.Renderers.IRenderer"/> and <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/>)
+            using profiling-guided analysis.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer.#ctor(System.Action{Libplanet.Blockchain.Renderers.Debug.InvalidRenderException})">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer"/> instance.
+            </summary>
+            <param name="onError">An optional event handler which is triggered when invalid
+            render events occur.</param>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.Debug.ValidatingActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.IActionRenderer">
+            <summary>
+            Listens state changes of every step of actions, besides blocks,
+            on a <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            If you need more fine-grained events than <see cref="T:Libplanet.Blockchain.Renderers.IRenderer"/>,
+            implement this interface instead.
+            <para>The invocation order of methods for each <see cref="T:Libplanet.Types.Blocks.Block"/> are:</para>
+            <list type="number">
+            <item><description><see cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/> (one time)
+            </description></item>
+            <item><description><see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>
+            &amp; <see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/> (zero or more
+            times)</description>
+            </item>
+            <item><description><see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/> (one time)</description>
+            </item>
+            </list>
+            </summary>
+            <remarks>Although <see cref="T:Libplanet.Types.Tx.Transaction"/>s affect the states in
+            the <see cref="T:Libplanet.Store.IStateStore"/> all or nothing at all (i.e., atomically),
+            <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> receives all action-related events
+            (<see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>/<see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>) <em>immediately</em>
+            without buffering, which means actions are rendered <em>even before</em> whether there are
+            any actions throwing an exception in the same transaction is determined.  In other words,
+            for <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/>s, it is not guaranteed that actions in a transaction
+            are atomic.
+            <para>If your action renderer expects to receive only render events about actions belonging
+            successful transactions, wrap your action renderer with
+            <see cref="T:Libplanet.Blockchain.Renderers.AtomicActionRenderer"/>.</para>
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})">
+            <summary>
+            Does things that should be done right after an <paramref name="action"/>
+            is executed and applied to the blockchain.
+            </summary>
+            <param name="action">An executed action.</param>
+            <param name="context">The equivalent context object to an object passed to
+            the <paramref name="action"/>'s <see cref="M:Libplanet.Action.IAction.Execute(Libplanet.Action.IActionContext)"/> method.
+            That means <see cref="P:Libplanet.Action.IActionContext.PreviousState"/> are the states right
+            <em>before</em> this action executed.  For the states after this action executed,
+            use the <paramref name="nextState"/> argument instead.</param>
+            <param name="nextState">The state root hash right <em>after</em> this action executed,
+            which means it is equivalent to the states <paramref name="action"/>'s
+            <see cref="M:Libplanet.Action.IAction.Execute(Libplanet.Action.IActionContext)"/> method returned.</param>
+            <remarks>
+            It is guaranteed to be called only once for an <paramref name="action"/>,
+            and only after applied to the blockchain, unless an exception is thrown during executing
+            the <paramref name="action"/> (in that case <see
+            cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/> is called instead) or
+            once the <paramref name="action"/> has been unrendered.
+            <para>Also note that this method is invoked after <see
+            cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/> method is called
+            (where its second parameter <c>newTip</c> contains a transaction the <paramref
+            name="action"/> belongs to).</para>
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)">
+            <summary>
+            Does the similar things to <see cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>, except that this method
+            is invoked when <paramref name="action"/> has terminated with an exception.
+            </summary>
+            <param name="action">An action which threw an exception during execution.</param>
+            <param name="context">The equivalent context object to an object passed to
+            the <paramref name="action"/>'s <see cref="M:Libplanet.Action.IAction.Execute(Libplanet.Action.IActionContext)"/> method.
+            That means <see cref="P:Libplanet.Action.IActionContext.PreviousState"/> are the states right
+            <em>before</em> this action executed.</param>
+            <param name="exception">The exception thrown during executing the <paramref
+            name="action"/>.</param>
+            <remarks>
+            Also note that this method is invoked after <see
+            cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/> method is called
+            (where its second parameter <c>newTip</c> contains a transaction the <paramref
+            name="action"/> belongs to).
+            </remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <summary>
+            Does things that should be done right all actions in a new <see cref="T:Libplanet.Types.Blocks.Block"/> are
+            rendered.
+            </summary>
+            <remarks>It is guaranteed to be called only once for a block.</remarks>
+            <param name="oldTip">The previous <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/>.</param>
+            <param name="newTip">The current <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/>.</param>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.IRenderer">
+            <summary>
+            Listens state changes on a <see cref="T:Libplanet.Blockchain.BlockChain"/>.
+            <para>Usually, implementations of this interface purpose to update the in-memory game states
+            (if exist), or send a signal to the UI thread (usually the main thread) so that the graphics
+            on the display is redrawn.</para>
+            <para>The invocation order of methods for each <see cref="T:Libplanet.Types.Blocks.Block"/> are:</para>
+            <list type="number">
+            <item><description><see cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/> (one time)</description>
+            </item>
+            </list>
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <summary>
+            Does things that should be done right after a new <see cref="T:Libplanet.Types.Blocks.Block"/> is appended to
+            a <see cref="T:Libplanet.Blockchain.BlockChain"/> (so that its <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/> has changed).
+            </summary>
+            <remarks>It is guaranteed to be called only once for a block, and only after applied to
+            the blockchain, unless it has been stale due to reorg.</remarks>
+            <param name="oldTip">The previous <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/>.</param>
+            <param name="newTip">The current <see cref="P:Libplanet.Blockchain.BlockChain.Tip"/>.</param>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.LoggedActionRenderer">
+            <summary>
+            Decorates an <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> so that all event messages are logged.
+            In other words, this is an <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> version of
+            <see cref="T:Libplanet.Blockchain.Renderers.LoggedRenderer"/>.
+            <para>Every single event message causes two log messages: one is logged <em>before</em>
+            rendering, and other one is logged <em>after</em> rendering.  If any exception is thrown
+            it is also logged with the log level <see cref="F:Serilog.Events.LogEventLevel.Error"/> (regardless of
+            <see cref="P:Libplanet.Blockchain.Renderers.LoggedRenderer.Level"/> configuration).</para>
+            </summary>
+            <example>
+            <code><![CDATA[
+            IActionRenderer actionRenderer = new SomeActionRenderer();
+            // Wraps the action renderer with LoggedActionRenderer:
+            actionRenderer = new LoggedActionRenderer(
+                actionRenderer,
+                Log.Logger,
+                LogEventLevel.Information,
+            );
+            ]]></code>
+            </example>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.LoggedActionRenderer.#ctor(Libplanet.Blockchain.Renderers.IActionRenderer,Serilog.ILogger,Serilog.Events.LogEventLevel)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Renderers.LoggedActionRenderer"/> instance which decorates the given
+            action <paramref name="renderer"/>.
+            </summary>
+            <param name="renderer">The actual action renderer to forward all event messages to and
+            actually render things.</param>
+            <param name="logger">The logger to write log messages to.  Note that all log messages
+            this decorator writes become in the context of the <paramref name="renderer"/>'s
+            type (with the context property <c>SourceContext</c>).</param>
+            <param name="level">The log event level.  All log messages become this level.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.LoggedActionRenderer.ActionRenderer">
+            <summary>
+            The inner action renderer to forward all event messages to and actually render things.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.LoggedActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderBlockEnd(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.LoggedActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderAction(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,Libplanet.Common.HashDigest{System.Security.Cryptography.SHA256})"/>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.LoggedActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IActionRenderer.RenderActionError(Bencodex.Types.IValue,Libplanet.Action.ICommittedActionContext,System.Exception)"/>
+        </member>
+        <member name="T:Libplanet.Blockchain.Renderers.LoggedRenderer">
+            <summary>
+            Decorates an <see cref="T:Libplanet.Blockchain.Renderers.IRenderer"/> so that all event messages are logged.
+            <para>Every single event message causes two log messages: one is logged <em>before</em>
+            rendering, and other one is logged <em>after</em> rendering.  If any exception is thrown
+            it is also logged with the log level <see cref="F:Serilog.Events.LogEventLevel.Error"/> (regardless of
+            <see cref="P:Libplanet.Blockchain.Renderers.LoggedRenderer.Level"/> configuration).</para>
+            </summary>
+            <example>
+            <code>
+            IRenderer renderer = new SomeRenderer();
+            // Wraps the renderer with LoggedRenderer:
+            renderer = new LoggedRenderer(
+                renderer,
+                Log.Logger,
+                LogEventLevel.Information,
+            );
+            </code>
+            </example>
+            <remarks>Since <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> is a subtype of <see cref="T:Libplanet.Blockchain.Renderers.IRenderer"/>,
+            <see cref="M:Libplanet.Blockchain.Renderers.LoggedRenderer.#ctor(Libplanet.Blockchain.Renderers.IRenderer,Serilog.ILogger,Serilog.Events.LogEventLevel)"/> constructor can take
+            an <see cref="T:Libplanet.Blockchain.Renderers.IActionRenderer"/> instance as well.  However, even it takes an action
+            renderer, action-level fine-grained events will not be logged.  For action renderers,
+            please use <see cref="T:Libplanet.Blockchain.Renderers.LoggedActionRenderer"/> instead.</remarks>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.LoggedRenderer.#ctor(Libplanet.Blockchain.Renderers.IRenderer,Serilog.ILogger,Serilog.Events.LogEventLevel)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.Blockchain.Renderers.LoggedRenderer"/> instance which decorates the given
+            <paramref name="renderer"/>.
+            </summary>
+            <param name="renderer">The actual renderer to forward all event messages to and actually
+            render things.</param>
+            <param name="logger">The logger to write log messages to.  Note that all log messages
+            this decorator writes become in the context of the <paramref name="renderer"/>'s
+            type (with the context property <c>SourceContext</c>).</param>
+            <param name="level">The log event level.  All log messages become this level.</param>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.LoggedRenderer.Renderer">
+            <summary>
+            The inner renderer to forward all event messages to and actually render things.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.LoggedRenderer.Level">
+            <summary>
+            The log event level.  All log messages become this level.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Blockchain.Renderers.LoggedRenderer.Logger">
+            <summary>
+            The logger to write log messages to.  Note that all log messages this decorator writes
+            become in the context of the <see cref="P:Libplanet.Blockchain.Renderers.LoggedRenderer.Renderer"/>'s type (with the context
+            property <c>SourceContext</c>).
+            </summary>
+        </member>
+        <member name="M:Libplanet.Blockchain.Renderers.LoggedRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)">
+            <inheritdoc cref="M:Libplanet.Blockchain.Renderers.IRenderer.RenderBlock(Libplanet.Types.Blocks.Block,Libplanet.Types.Blocks.Block)"/>
+        </member>
+        <member name="T:Libplanet.Consensus.Maj23">
+            <summary>
+            A class used to claim that a peer has collected two thirds majority of
+            <see cref="T:Libplanet.Types.Consensus.Vote"/>s.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23.#ctor(Libplanet.Consensus.Maj23Metadata,System.Collections.Immutable.ImmutableArray{System.Byte})">
+            <summary>
+            Instantiates a <see cref="T:Libplanet.Consensus.Maj23"/> with given <paramref name="maj23Metadata"/>
+            and its <paramref name="signature"/>.
+            </summary>
+            <param name="maj23Metadata">A <see cref="T:Libplanet.Consensus.Maj23Metadata"/> to claim.</param>
+            <param name="signature">A signature signed with <paramref name="maj23Metadata"/>.
+            </param>
+            <exception cref="T:System.ArgumentNullException">Thrown if given <paramref name="signature"/> is
+            empty.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if given <paramref name="signature"/> is
+            invalid and cannot be verified with <paramref name="maj23Metadata"/>.</exception>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.Height">
+            <inheritdoc cref="P:Libplanet.Consensus.Maj23Metadata.Height"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.Round">
+            <inheritdoc cref="P:Libplanet.Consensus.Maj23Metadata.Round"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.BlockHash">
+            <inheritdoc cref="P:Libplanet.Consensus.Maj23Metadata.BlockHash"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.Timestamp">
+            <inheritdoc cref="P:Libplanet.Consensus.Maj23Metadata.Timestamp"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.ValidatorPublicKey">
+            <inheritdoc cref="P:Libplanet.Consensus.Maj23Metadata.ValidatorPublicKey"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.Flag">
+            <inheritdoc cref="P:Libplanet.Consensus.Maj23Metadata.Flag"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.Signature">
+            <summary>
+            A signature that signed with <see cref="T:Libplanet.Consensus.Maj23Metadata"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.Maj23"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23.ByteArray">
+            <summary>
+            <see cref="T:System.Byte"/> encoded <see cref="T:Libplanet.Consensus.Maj23"/> data.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23.Verify">
+            <summary>
+            Verifies whether the <see cref="T:Libplanet.Consensus.Maj23Metadata"/> is properly signed by
+            <see cref="T:Libplanet.Types.Consensus.Validator"/>.
+            </summary>
+            <returns><see langword="true"/> if the <see cref="P:Libplanet.Consensus.Maj23.Signature"/> is not empty
+            and is a valid signature signed by <see cref="T:Libplanet.Types.Consensus.Validator"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23.Equals(Libplanet.Consensus.Maj23)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.Height">
+            <summary>
+            A height of given maj23 values.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.Round">
+            <summary>
+            A round of given maj23 values.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.BlockHash">
+            <summary>
+            The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> of vote claim.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.Timestamp">
+            <summary>
+            The time at which the claim took place.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.ValidatorPublicKey">
+            <summary>
+            A <see cref="T:Libplanet.Crypto.PublicKey"/> of claimant.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.Flag">
+            <summary>
+            The <see cref="T:Libplanet.Types.Consensus.VoteFlag"/> of the <see cref="T:Libplanet.Consensus.Maj23Metadata"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Maj23Metadata.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.Maj23Metadata"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23Metadata.Sign(Libplanet.Crypto.PrivateKey)">
+            <summary>
+            Signs given <see cref="T:Libplanet.Consensus.Maj23Metadata"/> with given <paramref name="signer"/>.
+            </summary>
+            <param name="signer">A <see cref="T:Libplanet.Crypto.PrivateKey"/> to sign.</param>
+            <returns>Returns a signed <see cref="T:Libplanet.Consensus.Maj23"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23Metadata.Equals(Libplanet.Consensus.Maj23Metadata)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23Metadata.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.Maj23Metadata.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.Consensus.Proposal">
+            <summary>
+            Represents a <see cref="T:Libplanet.Consensus.Proposal"/> from a validator for consensus.  It contains an
+            essential information <see cref="T:Libplanet.Consensus.ProposalMetadata"/> to propose a block for a consensus
+            in a height and a round, and its signature to verify. The signature is verified in
+            constructor, so the instance of <see cref="T:Libplanet.Consensus.Proposal"/> should be valid.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.Proposal.#ctor(Libplanet.Consensus.ProposalMetadata,System.Collections.Immutable.ImmutableArray{System.Byte})">
+            <summary>
+            Instantiates a <see cref="T:Libplanet.Consensus.Proposal"/> with given <paramref name="proposalMetadata"/>
+            and its <paramref name="signature"/>.
+            </summary>
+            <param name="proposalMetadata">A <see cref="T:Libplanet.Consensus.ProposalMetadata"/> to propose.</param>
+            <param name="signature">A signature signed with <paramref name="proposalMetadata"/>.
+            </param>
+            <exception cref="T:System.ArgumentNullException">Thrown if given <paramref name="signature"/> is
+            empty.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if given <paramref name="signature"/> is
+            invalid and cannot be verified with <paramref name="proposalMetadata"/>.</exception>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.Height">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.Height"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.Round">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.Round"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.BlockHash">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.BlockHash"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.Timestamp">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.Timestamp"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.ValidatorPublicKey">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.ValidatorPublicKey"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.MarshaledBlock">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.MarshaledBlock"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.ValidRound">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalMetadata.ValidRound"/>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.Signature">
+            <summary>
+            A signature that signed with <see cref="T:Libplanet.Consensus.ProposalMetadata"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.Proposal"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.Proposal.ByteArray">
+            <summary>
+            <see cref="T:System.Byte"/> encoded <see cref="T:Libplanet.Consensus.Proposal"/> data.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.Proposal.Verify">
+            <summary>
+            Verifies whether the <see cref="T:Libplanet.Consensus.ProposalMetadata"/> is properly signed by
+            <see cref="T:Libplanet.Types.Consensus.Validator"/>.
+            </summary>
+            <returns><see langword="true"/> if the <see cref="P:Libplanet.Consensus.Proposal.Signature"/> is not empty
+            and is a valid signature signed by <see cref="T:Libplanet.Types.Consensus.Validator"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.Proposal.Equals(Libplanet.Consensus.Proposal)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.Proposal.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.Proposal.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.Consensus.ProposalClaim">
+            <summary>
+            Represents a <see cref="T:Libplanet.Consensus.ProposalClaim"/> from a validator for consensus.  It contains an
+            essential information <see cref="T:Libplanet.Consensus.ProposalClaimMetadata"/> to claim a <see cref="T:Libplanet.Consensus.Proposal"/>
+            for a consensus in a height, round, <see cref="P:Libplanet.Consensus.ProposalClaim.BlockHash"/>, and its signature to verify.
+            The signature is verified in
+            constructor, so the instance of <see cref="T:Libplanet.Consensus.ProposalClaim"/> should be valid.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaim.#ctor(Libplanet.Consensus.ProposalClaimMetadata,System.Collections.Immutable.ImmutableArray{System.Byte})">
+            <summary>
+            Instantiates a <see cref="T:Libplanet.Consensus.ProposalClaim"/> with given <paramref name="metadata"/>
+            and its <paramref name="signature"/>.
+            </summary>
+            <param name="metadata">A <see cref="T:Libplanet.Consensus.ProposalClaimMetadata"/> to claim.</param>
+            <param name="signature">A signature signed with <paramref name="metadata"/>.
+            </param>
+            <exception cref="T:System.ArgumentNullException">Thrown if given <paramref name="signature"/> is
+            empty.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if given <paramref name="signature"/> is
+            invalid and cannot be verified with <paramref name="metadata"/>.</exception>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.Height">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalClaimMetadata.Height"/>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.Round">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalClaimMetadata.Round"/>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.BlockHash">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalClaimMetadata.BlockHash"/>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.Timestamp">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalClaimMetadata.Timestamp"/>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.ValidatorPublicKey">
+            <inheritdoc cref="P:Libplanet.Consensus.ProposalClaimMetadata.ValidatorPublicKey"/>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.Signature">
+            <summary>
+            A signature that signed with <see cref="T:Libplanet.Consensus.ProposalMetadata"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.ProposalClaim"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaim.ByteArray">
+            <summary>
+            <see cref="T:System.Byte"/> encoded <see cref="T:Libplanet.Consensus.Proposal"/> data.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaim.Verify">
+            <summary>
+            Verifies whether the <see cref="T:Libplanet.Consensus.ProposalMetadata"/> is properly signed by
+            <see cref="T:Libplanet.Types.Consensus.Validator"/>.
+            </summary>
+            <returns><see langword="true"/> if the <see cref="P:Libplanet.Consensus.ProposalClaim.Signature"/> is not empty
+            and is a valid signature signed by <see cref="T:Libplanet.Types.Consensus.Validator"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaim.Equals(Libplanet.Consensus.ProposalClaim)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaim.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaim.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.Consensus.ProposalClaimMetadata">
+            <summary>
+            A class for constructing <see cref="T:Libplanet.Consensus.ProposalClaim"/>. This class contains proposal claim
+            information in consensus of a height, round and <see cref="P:Libplanet.Consensus.ProposalClaimMetadata.BlockHash"/>.
+            Use <see cref="M:Libplanet.Consensus.ProposalClaimMetadata.Sign(Libplanet.Crypto.PrivateKey)"/> to create a <see cref="T:Libplanet.Consensus.ProposalClaim"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaimMetadata.#ctor(System.Int64,System.Int32,Libplanet.Types.Blocks.BlockHash,System.DateTimeOffset,Libplanet.Crypto.PublicKey)">
+            <summary>
+            Instantiates <see cref="T:Libplanet.Consensus.ProposalClaimMetadata"/> with given parameters.
+            </summary>
+            <param name="height">A height of given claim values.</param>
+            <param name="round">A round of given claim values.</param>
+            <param name="blockHash">A <see cref="P:Libplanet.Consensus.ProposalClaimMetadata.BlockHash"/> of given proposal to claim.</param>
+            <param name="timestamp">The time at which the proposal took place.</param>
+            <param name="validatorPublicKey">a <see cref="T:Libplanet.Crypto.PublicKey"/> of proposing validator.
+            </param>
+            <exception cref="T:System.ArgumentOutOfRangeException">This can be thrown in following reasons:
+            <list type="bullet">
+            <item><description>
+                Given <paramref name="height"/> is less than 0.
+            </description></item>
+            <item><description>
+                Given <paramref name="round"/> is less than 0.
+            </description></item>
+            </list>
+            </exception>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaimMetadata.Height">
+            <summary>
+            A height of given proposal values.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaimMetadata.Round">
+            <summary>
+            A round of given proposal values.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaimMetadata.BlockHash">
+            <summary>
+            The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> of <see cref="T:Libplanet.Consensus.Proposal"/> to claim.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaimMetadata.Timestamp">
+            <summary>
+            The time at which the proposal took place.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaimMetadata.ValidatorPublicKey">
+            <summary>
+            A <see cref="T:Libplanet.Crypto.PublicKey"/> of proposing validator.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalClaimMetadata.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.ProposalMetadata"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaimMetadata.Sign(Libplanet.Crypto.PrivateKey)">
+            <summary>
+            Signs given <see cref="T:Libplanet.Consensus.ProposalMetadata"/> with given <paramref name="signer"/>.
+            </summary>
+            <param name="signer">A <see cref="T:Libplanet.Crypto.PrivateKey"/> to sign.</param>
+            <returns>Returns a signed <see cref="T:Libplanet.Consensus.Proposal"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaimMetadata.Equals(Libplanet.Consensus.ProposalClaimMetadata)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaimMetadata.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalClaimMetadata.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.Consensus.ProposalMetadata">
+            <summary>
+            A class for constructing <see cref="T:Libplanet.Consensus.Proposal"/>. This class contains proposal information
+            in consensus of a height and a round. Use <see cref="M:Libplanet.Consensus.ProposalMetadata.Sign(Libplanet.Crypto.PrivateKey)"/> to create a
+            <see cref="T:Libplanet.Consensus.Proposal"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalMetadata.#ctor(System.Int64,System.Int32,System.DateTimeOffset,Libplanet.Crypto.PublicKey,System.Byte[],System.Int32)">
+            <summary>
+            Instantiates <see cref="T:Libplanet.Consensus.ProposalMetadata"/> with given parameters.
+            </summary>
+            <param name="height">a height of given proposal values.</param>
+            <param name="round">a round of given proposal values.</param>
+            <param name="timestamp">The time at which the proposal took place.</param>
+            <param name="validatorPublicKey">a <see cref="T:Libplanet.Crypto.PublicKey"/> of proposing validator.
+            </param>
+            <param name="validRound">a latest valid round at the moment of given proposal.</param>
+            <param name="marshaledBlock">a marshaled bencodex-encoded <see cref="T:System.Byte"/> array of
+            block.</param>
+            <exception cref="T:System.ArgumentOutOfRangeException">This can be thrown in following reasons:
+            <list type="bullet">
+            <item><description>
+                Given <paramref name="height"/> is less than 0.
+            </description></item>
+            <item><description>
+                Given <paramref name="round"/> is less than 0.
+            </description></item>
+            <item><description>
+                Given <paramref name="validRound"/> is less than -1.
+            </description></item>
+            </list>
+            </exception>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.Height">
+            <summary>
+            A height of given proposal values.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.Round">
+            <summary>
+            A round of given proposal values.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.BlockHash">
+            <summary>
+            The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> of <see cref="P:Libplanet.Consensus.ProposalMetadata.MarshaledBlock"/>.
+            This is automatically derived from <see cref="P:Libplanet.Consensus.ProposalMetadata.MarshaledBlock"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.Timestamp">
+            <summary>
+            The time at which the proposal took place.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.ValidatorPublicKey">
+            <summary>
+            A <see cref="T:Libplanet.Crypto.PublicKey"/> of proposing validator.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.MarshaledBlock">
+            <summary>
+            A marshaled bencodex-encoded <see cref="T:System.Byte"/> array of block.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.ValidRound">
+            <summary>
+            a latest valid round at the moment of given proposal.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.ProposalMetadata.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.ProposalMetadata"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalMetadata.Sign(Libplanet.Crypto.PrivateKey)">
+            <summary>
+            Signs given <see cref="T:Libplanet.Consensus.ProposalMetadata"/> with given <paramref name="signer"/>.
+            </summary>
+            <param name="signer">A <see cref="T:Libplanet.Crypto.PrivateKey"/> to sign.</param>
+            <returns>Returns a signed <see cref="T:Libplanet.Consensus.Proposal"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalMetadata.Equals(Libplanet.Consensus.ProposalMetadata)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalMetadata.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.ProposalMetadata.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.Consensus.VoteSetBits">
+            <summary>
+            A class used to requests lacking votes by sending <see cref="T:Libplanet.Types.Consensus.Vote"/>s that the peer has.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBits.#ctor(Libplanet.Consensus.VoteSetBitsMetadata,System.Collections.Immutable.ImmutableArray{System.Byte})">
+            <summary>
+            Instantiates a <see cref="T:Libplanet.Consensus.VoteSetBits"/> with given
+            <paramref name="voteSetBitsMetadata"/> and its <paramref name="signature"/>.
+            </summary>
+            <param name="voteSetBitsMetadata">
+            A <see cref="T:Libplanet.Consensus.VoteSetBitsMetadata"/> to request.</param>
+            <param name="signature">A signature signed with <paramref name="voteSetBitsMetadata"/>.
+            </param>
+            <exception cref="T:System.ArgumentNullException">Thrown if given <paramref name="signature"/> is
+            empty.</exception>
+            <exception cref="T:System.ArgumentException">Thrown if given <paramref name="signature"/> is
+            invalid and cannot be verified with <paramref name="voteSetBitsMetadata"/>.</exception>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.Height">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.Height"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.Round">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.Round"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.BlockHash">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.BlockHash"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.Timestamp">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.Timestamp"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.ValidatorPublicKey">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.ValidatorPublicKey"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.Flag">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.Flag"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.VoteBits">
+            <inheritdoc cref="P:Libplanet.Consensus.VoteSetBitsMetadata.VoteBits"/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.Signature">
+            <summary>
+            A signature that signed with <see cref="T:Libplanet.Consensus.VoteSetBitsMetadata"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.VoteSetBits"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBits.ByteArray">
+            <summary>
+            <see cref="T:System.Byte"/> encoded <see cref="T:Libplanet.Consensus.VoteSetBits"/> data.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBits.Verify">
+            <summary>
+            Verifies whether the <see cref="T:Libplanet.Consensus.VoteSetBitsMetadata"/> is properly signed by
+            <see cref="T:Libplanet.Types.Consensus.Validator"/>.
+            </summary>
+            <returns><see langword="true"/> if the <see cref="P:Libplanet.Consensus.VoteSetBits.Signature"/> is not empty
+            and is a valid signature signed by <see cref="T:Libplanet.Types.Consensus.Validator"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBits.Equals(Libplanet.Consensus.VoteSetBits)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBits.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBits.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.Height">
+            <summary>
+            A height of the votes in the given vote set.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.Round">
+            <summary>
+            A round of the votes in the given vote set.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.BlockHash">
+            <summary>
+            The <see cref="T:Libplanet.Types.Blocks.BlockHash"/> of the votes in the vote sets.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.Timestamp">
+            <summary>
+            The time at which the set is created.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.ValidatorPublicKey">
+            <summary>
+            A <see cref="T:Libplanet.Crypto.PublicKey"/> of the vote set.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.Flag">
+            <summary>
+            The <see cref="T:Libplanet.Types.Consensus.VoteFlag"/> of the votes in the vote set.
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.VoteBits">
+            <summary>
+            <see cref="T:System.Boolean"/>s of the vote set to be .
+            </summary>
+        </member>
+        <member name="P:Libplanet.Consensus.VoteSetBitsMetadata.Encoded">
+            <summary>
+            A Bencodex-encoded value of <see cref="T:Libplanet.Consensus.VoteSetBitsMetadata"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBitsMetadata.Sign(Libplanet.Crypto.PrivateKey)">
+            <summary>
+            Signs given <see cref="T:Libplanet.Consensus.VoteSetBitsMetadata"/> with given <paramref name="signer"/>.
+            </summary>
+            <param name="signer">A <see cref="T:Libplanet.Crypto.PrivateKey"/> to sign.</param>
+            <returns>Returns a signed <see cref="T:Libplanet.Consensus.VoteSetBits"/>.</returns>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBitsMetadata.Equals(Libplanet.Consensus.VoteSetBitsMetadata)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBitsMetadata.Equals(System.Object)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.Consensus.VoteSetBitsMetadata.GetHashCode">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.KeyStore.Ciphers.Aes128Ctr">
+            <summary>
+            AES-128-CTR (AES 128-bit in counter moder).
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.Aes128Ctr.#ctor(System.Byte[])">
+            <summary>
+            Creates an <see cref="T:Libplanet.KeyStore.Ciphers.Aes128Ctr"/> instance with the given <paramref name="iv"/>.
+            </summary>
+            <param name="iv">Initialization vector.</param>
+            <exception cref="T:System.ArgumentException">Thrown when the length of <paramref name="iv"/> is
+            invalid.</exception>
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.Aes128Ctr.#ctor(System.Collections.Immutable.ImmutableArray{System.Byte}@)">
+            <summary>
+            Creates an <see cref="T:Libplanet.KeyStore.Ciphers.Aes128Ctr"/> instance with the given <paramref name="iv"/>.
+            </summary>
+            <param name="iv">Initialization vector.</param>
+            <exception cref="T:System.ArgumentException">Thrown when the length of <paramref name="iv"/> is
+            invalid.</exception>
+        </member>
+        <member name="P:Libplanet.KeyStore.Ciphers.Aes128Ctr.Iv">
+            <summary>
+            Initialization vector.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.Aes128Ctr.Encrypt(System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Collections.Immutable.ImmutableArray{System.Byte}@)">
+            <inheritdoc />
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.Aes128Ctr.Decrypt(System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Collections.Immutable.ImmutableArray{System.Byte}@)">
+            <inheritdoc />
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.Aes128Ctr.WriteJson(System.Text.Json.Utf8JsonWriter)">
+            <inheritdoc />
+        </member>
+        <member name="T:Libplanet.KeyStore.Ciphers.ICipher">
+            <summary>
+            An interface to define symmetric cipher algorithm.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.ICipher.Encrypt(System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Collections.Immutable.ImmutableArray{System.Byte}@)">
+            <summary>
+            Encrypts the given <paramref name="plaintext"/> using the given <paramref name="key"/>.
+            </summary>
+            <param name="key">A symmetric key.</param>
+            <param name="plaintext">An immutable <see cref="T:System.Byte"/> array to encrypt.</param>
+            <returns>The ciphertext made from the <paramref name="plaintext"/>
+            using the <paramref name="key"/>.</returns>
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.ICipher.Decrypt(System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Collections.Immutable.ImmutableArray{System.Byte}@)">
+            <summary>
+            Decrypts the given <paramref name="ciphertext"/> using the given <paramref name="key"/>.
+            </summary>
+            <param name="key">A symmetric key.</param>
+            <param name="ciphertext">An immutable <see cref="T:System.Byte"/> array to decrypt.</param>
+            <returns>The plain text decrypted from the <paramref name="ciphertext"/>
+            using the <paramref name="key"/>.</returns>
+        </member>
+        <member name="M:Libplanet.KeyStore.Ciphers.ICipher.WriteJson(System.Text.Json.Utf8JsonWriter)">
+            <summary>
+            Dumps the cipher parameters as a JSON representation according to Ethereum's
+            <a href="https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition">Web3
+            Secret Storage Definition</a>.
+            </summary>
+            <param name="writer">A JSON writer which has not begun object nor array.</param>
+            <returns>A unique identifier of the cipher algorithm.  This is going to be the
+            <c>crypto.cipher</c> field in the key JSON file.</returns>
+        </member>
+        <member name="T:Libplanet.KeyStore.IKeyStore">
+            <summary>
+            The interface to store <see cref="T:Libplanet.KeyStore.ProtectedPrivateKey"/>s.  An appropriate implementation
+            should be used according to a running platform.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.IKeyStore.ListIds">
+            <summary>
+            Lists all keys IDs in the key store.
+            </summary>
+            <returns>All keys IDs in the key store.  The order is undefined and not deterministic.
+            </returns>
+        </member>
+        <member name="M:Libplanet.KeyStore.IKeyStore.List">
+            <summary>
+            Lists all keys in the key store.
+            </summary>
+            <returns>All keys in the key store.  The order is undefined and not deterministic.
+            </returns>
+        </member>
+        <member name="M:Libplanet.KeyStore.IKeyStore.Get(System.Guid)">
+            <summary>
+            Looks for a key having the requested <paramref name="id"/> in the key store.
+            </summary>
+            <param name="id">The key ID to look for.</param>
+            <returns>The found key.</returns>
+            <exception cref="T:Libplanet.KeyStore.NoKeyException">Thrown when there are no key of the given
+            <paramref name="id"/>.</exception>
+        </member>
+        <member name="M:Libplanet.KeyStore.IKeyStore.Add(Libplanet.KeyStore.ProtectedPrivateKey)">
+            <summary>
+            Adds a new <paramref name="key"/> into the key store.
+            </summary>
+            <param name="key">A key to add.</param>
+            <returns>The id of the added <paramref name="key"/>.</returns>
+            <exception cref="T:System.ArgumentNullException">Thrown when <see langword="null"/> is passed to
+            <paramref name="key"/>.</exception>
+        </member>
+        <member name="M:Libplanet.KeyStore.IKeyStore.Remove(System.Guid)">
+            <summary>
+            Removes a key having the given <pramref name="id"/> from the key store.
+            </summary>
+            <param name="id">The key ID to remove.</param>
+            <exception cref="T:Libplanet.KeyStore.NoKeyException">Thrown when there is no key having
+            the given <paramref name="id"/>.</exception>
+        </member>
+        <member name="T:Libplanet.KeyStore.IncorrectPassphraseException">
+            <summary>
+            The exception that is thrown when a user input passphrase (i.e., password) is incorrect.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.IncorrectPassphraseException.#ctor(System.String,System.String,System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Collections.Immutable.ImmutableArray{System.Byte}@)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.KeyStore.IncorrectPassphraseException"/> object.
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.
+            </param>
+            <param name="paramName">The name of the parameter that caused the current exception.
+            </param>
+            <param name="expectedMac">The expected MAC of the correct passphrase.
+            It is automatically included to the <paramref name="message"/> string.</param>
+            <param name="inputMac">The actual MAC of the user input passphrase.
+            It is automatically included to the <paramref name="message"/> string.</param>
+        </member>
+        <member name="P:Libplanet.KeyStore.IncorrectPassphraseException.ExpectedMac">
+            <summary>
+            The expected MAC of the correct passphrase.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.IncorrectPassphraseException.InputMac">
+            <summary>
+            The actual MAC of the user input passphrase.
+            </summary>
+        </member>
+        <member name="T:Libplanet.KeyStore.InvalidKeyJsonException">
+            <summary>
+            The exception that is thrown when a key JSON is invalid, e.g., missing field.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.InvalidKeyJsonException.#ctor(System.String)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.KeyStore.InvalidKeyJsonException"/> instance.
+            </summary>
+            <param name="message">A detailed exception message.</param>
+        </member>
+        <member name="T:Libplanet.KeyStore.Kdfs.IKdf">
+            <summary>
+            An interface to form key derivation functions (KDF) that are used to derive a valid
+            cryptographic key from a user input passphrase (i.e., password).
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.IKdf.Derive(System.String)">
+            <summary>
+            Derives a cryptographic key in <see cref="T:System.Byte"/>s from a user input
+            <paramref name="passphrase"/>.
+            </summary>
+            <param name="passphrase">A user input passphrase.</param>
+            <returns>A derived cryptographic key.</returns>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.IKdf.WriteJson(System.Text.Json.Utf8JsonWriter)">
+            <summary>
+            Dumps the KDF parameters as a JSON representation.
+            </summary>
+            <param name="writer">A JSON writer which has not begun object nor array.</param>
+            <returns>A unique identifier of the KDF.  This is going to be the
+            <c>crypto.kdf</c> field in the key JSON file.</returns>
+        </member>
+        <member name="T:Libplanet.KeyStore.Kdfs.Pbkdf2`1">
+            <summary>
+            <a href="https://en.wikipedia.org/wiki/PBKDF2">PBKDF2</a>.
+            </summary>
+            <typeparam name="T">PRF (pseudorandom function) to use, e.g.,
+            <see cref="T:Org.BouncyCastle.Crypto.Digests.Sha256Digest"/>.</typeparam>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Pbkdf2`1.#ctor(System.Int32,System.Byte[],System.Int32)">
+            <summary>
+            Configures parameters of <a href="https://en.wikipedia.org/wiki/PBKDF2">PBKDF2</a>.
+            </summary>
+            <param name="iterations">The number of iterations desired.
+            Corresponds to <c>c</c>.</param>
+            <param name="salt">A cryptographic salt.</param>
+            <param name="keyLength">The desired byte-length of the derived key.
+            Corresponds to <c>dkLen</c> except that it's not bit-wise but byte-wise.</param>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Pbkdf2`1.#ctor(System.Int32,System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Int32)">
+            <summary>
+            Configures parameters of <a href="https://en.wikipedia.org/wiki/PBKDF2">PBKDF2</a>.
+            </summary>
+            <param name="iterations">The number of iterations desired.
+            Corresponds to <c>c</c>.</param>
+            <param name="salt">A cryptographic salt.</param>
+            <param name="keyLength">The desired byte-length of the derived key.
+            Corresponds to <c>dkLen</c> except that it's not bit-wise but byte-wise.</param>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Pbkdf2`1.Iterations">
+            <summary>
+            The number of iterations desired.  Corresponds to <c>c</c>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Pbkdf2`1.KeyLength">
+            <summary>
+            The desired byte-length of the derived key.
+            Corresponds to <c>dkLen</c> except that it's not bit-wise but byte-wise.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Pbkdf2`1.Salt">
+            <summary>
+            A cryptographic salt.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Pbkdf2`1.Derive(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Pbkdf2`1.WriteJson(System.Text.Json.Utf8JsonWriter)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.KeyStore.Kdfs.Scrypt">
+            <summary>
+            <a href="https://en.wikipedia.org/wiki/Scrypt">Scrypt</a>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Scrypt.#ctor(System.Int32,System.Byte[],System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Configures parameters of <a href="https://en.wikipedia.org/wiki/Scrypt">Scrypt</a>.
+            </summary>
+            <param name="cost">The CPU/memory cost parameter. Corresponds to <c>n</c>.</param>
+            <param name="salt">A cryptographic salt.</param>
+            <param name="keyLength">The desired byte-length of the derived key.
+            Corresponds to <c>dkLen</c> except that it's not bit-wise but byte-wise.</param>
+            <param name="parallelization">The parallelization parameter.
+            Corresponds to <c>p</c>.</param>
+            <param name="blockSize">The blocksize parameter. Corresponds to <c>r</c>.</param>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Scrypt.#ctor(System.Int32,System.Collections.Immutable.ImmutableArray{System.Byte}@,System.Int32,System.Int32,System.Int32)">
+            <summary>
+            Configures parameters of <a href="https://en.wikipedia.org/wiki/Scrypt">Scrypt</a>.
+            </summary>
+            <param name="cost">The CPU/memory cost parameter. Corresponds to <c>n</c>.</param>
+            <param name="salt">A cryptographic salt.</param>
+            <param name="keyLength">The desired byte-length of the derived key.
+            Corresponds to <c>dkLen</c> except that it's not bit-wise but byte-wise.</param>
+            <param name="parallelization">The parallelization parameter.
+            Corresponds to <c>p</c>.</param>
+            <param name="blockSize">The blocksize parameter. Corresponds to <c>r</c>.</param>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Scrypt.Cost">
+            <summary>
+            The CPU/memory cost parameter. Corresponds to <c>n</c>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Scrypt.KeyLength">
+            <summary>
+            The desired byte-length of the derived key.
+            Corresponds to <c>dkLen</c> except that it's not bit-wise but byte-wise.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Scrypt.Salt">
+            <summary>
+            A cryptographic salt.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Scrypt.Parallelization">
+            <summary>
+            The parallelization parameter. Corresponds to <c>p</c>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.Kdfs.Scrypt.BlockSize">
+            <summary>
+            The blocksize parameter. Corresponds to <c>r</c>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Scrypt.Derive(System.String)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.KeyStore.Kdfs.Scrypt.WriteJson(System.Text.Json.Utf8JsonWriter)">
+            <inheritdoc/>
+        </member>
+        <member name="T:Libplanet.KeyStore.KeyJsonException">
+            <summary>
+            Serves as the base class for exceptions thrown by
+            <see cref="M:Libplanet.KeyStore.ProtectedPrivateKey.FromJson(System.String)"/> method.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.KeyJsonException.#ctor(System.String)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.KeyStore.KeyJsonException"/> instance with a message.
+            </summary>
+            <param name="message">A detailed exception message.</param>
+        </member>
+        <member name="T:Libplanet.KeyStore.KeyStoreException">
+            <summary>
+            Serves as the base class for exceptions thrown by <see cref="T:Libplanet.KeyStore.IKeyStore"/>
+            implementations.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.KeyStoreException.#ctor(System.String)">
+            <summary>
+            Initializes a new instance with the given <paramref name="message"/>.
+            </summary>
+            <param name="message">A descriptive error message for programmers.
+            Goes to <see cref="P:System.Exception.Message"/>.</param>
+        </member>
+        <member name="T:Libplanet.KeyStore.MismatchedAddressException">
+            <summary>
+            The exception that is thrown when an unprotected private key's actual address does
+            not match to the expected address.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.MismatchedAddressException.#ctor(System.String,Libplanet.Crypto.Address@,Libplanet.Crypto.Address@)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.KeyStore.MismatchedAddressException"/> object.
+            </summary>
+            <param name="message">The error message that explains the reason for the exception.
+            </param>
+            <param name="expectedAddress">The expected address of a protected private key.
+            It is automatically included to the <paramref name="message"/> string.</param>
+            <param name="actualAddress">The actual address of an unprotected private key.
+            It is automatically included to the <paramref name="message"/> string.</param>
+        </member>
+        <member name="P:Libplanet.KeyStore.MismatchedAddressException.ExpectedAddress">
+            <summary>
+            The expected address of the protected private key.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.MismatchedAddressException.ActualAddress">
+            <summary>
+            The actual address of the unprotected private key.
+            </summary>
+        </member>
+        <member name="T:Libplanet.KeyStore.NoKeyException">
+            <summary>
+            The exception that is thrown when there is no <see cref="T:Libplanet.KeyStore.ProtectedPrivateKey"/>
+            with a given key ID in an <see cref="T:Libplanet.KeyStore.IKeyStore"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.NoKeyException.#ctor(System.String,System.Guid)">
+            <summary>
+            Instantiates a new exception object with proper metadata.
+            </summary>
+            <param name="message">A descriptive error message for programmers.
+            Goes to <see cref="P:System.Exception.Message"/>.</param>
+            <param name="keyId">The key ID tried to look for.
+            It is automatically included to the <see cref="P:System.Exception.Message"/>
+            string.
+            </param>
+        </member>
+        <member name="P:Libplanet.KeyStore.NoKeyException.KeyId">
+            <summary>
+            The key ID tried to look for.
+            </summary>
+        </member>
+        <member name="T:Libplanet.KeyStore.ProtectedPrivateKey">
+            <summary>
+            Protects a <see cref="T:Libplanet.Crypto.PrivateKey"/> with a passphrase (i.e., password).
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.#ctor(Libplanet.Crypto.Address,Libplanet.KeyStore.Kdfs.IKdf,System.Byte[],Libplanet.KeyStore.Ciphers.ICipher,System.Byte[])">
+            <summary>
+            Loads a protected private key.
+            </summary>
+            <param name="address">The address of the protected private key.</param>
+            <param name="kdf">A key derivation function to derive a symmetric key to decrypt
+            a <see cref="T:Libplanet.Crypto.PrivateKey"/>.</param>
+            <param name="mac">MAC digest to check if a derived key is correct or not.</param>
+            <param name="cipher">A symmetric cipher to decrypt a <see cref="T:Libplanet.Crypto.PrivateKey"/>.</param>
+            <param name="ciphertext">An encrypted <see cref="T:Libplanet.Crypto.PrivateKey"/>.</param>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.#ctor(Libplanet.Crypto.Address,Libplanet.KeyStore.Kdfs.IKdf,System.Collections.Immutable.ImmutableArray{System.Byte},Libplanet.KeyStore.Ciphers.ICipher,System.Collections.Immutable.ImmutableArray{System.Byte})">
+            <summary>
+            Loads a protected private key.
+            </summary>
+            <param name="address">The address of the protected private key.</param>
+            <param name="kdf">A key derivation function to derive a symmetric key to decrypt
+            a <see cref="T:Libplanet.Crypto.PrivateKey"/>.</param>
+            <param name="mac">MAC digest to check if a derived key is correct or not.</param>
+            <param name="cipher">A symmetric cipher to decrypt a <see cref="T:Libplanet.Crypto.PrivateKey"/>.</param>
+            <param name="ciphertext">An encrypted <see cref="T:Libplanet.Crypto.PrivateKey"/>.</param>
+        </member>
+        <member name="P:Libplanet.KeyStore.ProtectedPrivateKey.Address">
+            <summary>
+            The address of the protected private key.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.ProtectedPrivateKey.Kdf">
+            <summary>
+            A key derivation function to derive a symmetric key to decrypt
+            a <see cref="T:Libplanet.Crypto.PrivateKey"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.ProtectedPrivateKey.Cipher">
+            <summary>
+            A symmetric cipher to decrypt a <see cref="T:Libplanet.Crypto.PrivateKey"/>.
+            </summary>
+        </member>
+        <member name="P:Libplanet.KeyStore.ProtectedPrivateKey.Ciphertext">
+            <summary>
+            An encrypted <see cref="T:Libplanet.Crypto.PrivateKey"/>.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.Protect(Libplanet.Crypto.PrivateKey,System.String)">
+            <summary>
+            Protects a bare <see cref="T:Libplanet.Crypto.PrivateKey"/> using a user input
+            <paramref name="passphrase"/>.
+            </summary>
+            <param name="privateKey">A bare private key to protect.</param>
+            <param name="passphrase">A user input passphrase (i.e., password).</param>
+            <returns>A passphrase-protected private key.</returns>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.FromJson(System.String)">
+            <summary>
+            Loads a <see cref="T:Libplanet.KeyStore.ProtectedPrivateKey"/> from a JSON, according to Ethereum's
+            <a href="https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition">Web3
+            Secret Storage Definition</a>.
+            </summary>
+            <param name="json">A JSON string that encodes a <see cref="T:Libplanet.KeyStore.ProtectedPrivateKey"/>.
+            </param>
+            <returns>A protected private key loaded from the given <paramref name="json"/>.
+            </returns>
+            <exception cref="T:System.Text.Json.JsonException">Thrown when the given <paramref name="json"/> is not
+            a valid JSON.</exception>
+            <exception cref="T:Libplanet.KeyStore.InvalidKeyJsonException">Thrown when the given key data lacks some
+            required fields or consists of wrong types.</exception>
+            <exception cref="T:Libplanet.KeyStore.UnsupportedKeyJsonException">Thrown when the given key data depends on
+            an unsupported features (e.g., KDF).</exception>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.Unprotect(System.String)">
+            <summary>
+            Gets the protected <see cref="T:Libplanet.Crypto.PrivateKey"/> using a user input
+            <paramref name="passphrase"/>.
+            </summary>
+            <param name="passphrase">A user input passphrase (i.e., password).</param>
+            <returns>A bare <see cref="T:Libplanet.Crypto.PrivateKey"/>.</returns>
+            <exception cref="T:Libplanet.KeyStore.IncorrectPassphraseException">Thrown when the given
+            <paramref name="passphrase"/> does not match to the <see cref="T:Libplanet.KeyStore.ProtectedPrivateKey"/>'s
+            passphrase.</exception>
+            <exception cref="T:Libplanet.KeyStore.MismatchedAddressException">Thrown when the unprotected
+            <see cref="T:Libplanet.Crypto.PrivateKey"/> does not match to the expected <see cref="P:Libplanet.KeyStore.ProtectedPrivateKey.Address"/>.
+            </exception>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.WriteJson(System.Text.Json.Utf8JsonWriter,System.Nullable{System.Guid}@)">
+            <summary>
+            Dumps the cipher parameters as a JSON representation according to Ethereum's
+            <a href="https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition">Web3
+            Secret Storage Definition</a>.
+            </summary>
+            <param name="writer">A JSON writer which has not begun object nor array.</param>
+            <param name="id">A unique identifier, which goes to the <c>id</c> field in the key JSON
+            file.  If <see langword="null"/> (which is default) it is random-generated.</param>
+        </member>
+        <member name="M:Libplanet.KeyStore.ProtectedPrivateKey.WriteJson(System.IO.Stream,System.Nullable{System.Guid}@)">
+            <summary>
+            Dumps the cipher parameters as a JSON representation according to Ethereum's
+            <a href="https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition">Web3
+            Secret Storage Definition</a>.
+            </summary>
+            <param name="stream">The destination for writing JSON text.</param>
+            <param name="id">A unique identifier, which goes to the <c>id</c> field in the key JSON
+            file.  If <see langword="null"/> (which is default) it is random-generated.</param>
+        </member>
+        <member name="T:Libplanet.KeyStore.UnsupportedKeyJsonException">
+            <summary>
+            The exception that is thrown when a key JSON is valid but uses an unsupported feature,
+            e.g., unsupported cipher algorithm.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.UnsupportedKeyJsonException.#ctor(System.String)">
+            <summary>
+            Creates a new <see cref="T:Libplanet.KeyStore.UnsupportedKeyJsonException"/> instance with a message.
+            </summary>
+            <param name="message">A detailed exception message.</param>
+        </member>
+        <member name="T:Libplanet.KeyStore.Web3KeyStore">
+            <summary>
+            <a href="https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition">Web3 Secret
+            Storage</a> (i.e., Ethereum-style key store) compliant <see cref="T:Libplanet.KeyStore.IKeyStore"/>
+            implementation.  Key files are placed in a directory of the <see cref="P:Libplanet.KeyStore.Web3KeyStore.Path"/>.
+            <para>Use <see cref="P:Libplanet.KeyStore.Web3KeyStore.DefaultKeyStore"/> property to get an instance.</para>
+            <para>In order to get an instance with a customized directory,
+            use the <see cref="M:Libplanet.KeyStore.Web3KeyStore.#ctor(System.String)"/> constructor.</para>
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Web3KeyStore.#ctor(System.String)">
+            <summary>
+            Creates a <see cref="T:Libplanet.KeyStore.Web3KeyStore"/> instance with a custom directory
+            <paramref name="path"/>.
+            </summary>
+            <param name="path">A path of the directory to store key files.  A new directory is
+            created if not exists.</param>
+            <exception cref="T:System.ArgumentNullException">Thrown when <see langword="null"/> is passed to
+            <paramref name="path"/>.</exception>
+            <seealso cref="P:Libplanet.KeyStore.Web3KeyStore.DefaultKeyStore"/>
+        </member>
+        <member name="P:Libplanet.KeyStore.Web3KeyStore.DefaultKeyStore">
+            <summary>
+            A default <see cref="T:Libplanet.KeyStore.Web3KeyStore"/> instance which refers to a user-local directory.
+            The <see cref="P:Libplanet.KeyStore.Web3KeyStore.Path"/> differs on the platform:
+            <list type="table">
+            <listheader>
+            <term>OS</term>
+            <description>Directory path</description>
+            </listheader>
+            <item>
+            <term>Linux/macOS</term>
+            <description><var>$HOME</var>/.config/planetarium/keystore</description>
+            </item>
+            <item>
+            <term>Windows</term>
+            <description><var>%AppData%</var>\planetarium\keystore</description>
+            </item>
+            </list>
+            </summary>
+            <seealso cref="M:Libplanet.KeyStore.Web3KeyStore.#ctor(System.String)"/>
+        </member>
+        <member name="P:Libplanet.KeyStore.Web3KeyStore.Path">
+            <summary>
+            The path of the directory key files are placed.
+            </summary>
+        </member>
+        <member name="M:Libplanet.KeyStore.Web3KeyStore.List">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.KeyStore.Web3KeyStore.ListIds">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.KeyStore.Web3KeyStore.Get(System.Guid)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.KeyStore.Web3KeyStore.Add(Libplanet.KeyStore.ProtectedPrivateKey)">
+            <inheritdoc/>
+        </member>
+        <member name="M:Libplanet.KeyStore.Web3KeyStore.Remove(System.Guid)">
+            <inheritdoc/>
+        </member>
+    </members>
+</doc>
