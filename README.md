@@ -1,11 +1,15 @@
 # Nine CMD Your Server
+
 ![](https://i.imgur.com/pT003IC.png)
 
-## Giới thiệu 
+## Giới thiệu
+
 ### Server ký các giao dịch của game Nine Chronicles bằng api python
+
 ###### Tìm hiểu thêm tại [Gitbook (hiện tại thì chưa có gì)](https://tan-dot-bt.gitbook.io/9cmd/)
 
 ## Giới thiệu
+
 - Giúp chơi được Nine Chronicles qua web
 - Vấn đề bảo mật thì tương đối do người code không có chuyên môn cái này :v
 - Sử dụng planet để ký, cơ sở lý thuyết [ở đây](https://devforum.nine-chronicles.com/t/transfer-asset-with-graphql-queries/59#sign-the-unsigned-message-with-planet-command-4)
@@ -13,12 +17,12 @@
 - Hỗ trợ chạy trên cả linux và windows, cả 2 đều cần là 64bit do planet yêu cầu vậy :D
 
 ## Tính năng
+
 - Truy vấn public key của ví đang có UTC file
 - Ký các giao dịch của game Nine Chronicles
-- Bảo mật 3 lớp: User/pass, chặn các ip lạ và chặn ký các giao dịch chứa ký tự không mong muốn
+- Bảo mật 3 lớp: User/pass, chặn các ip lạ và chặn/chỉ cho phép ký các giao dịch chứa ký tự mong muốn
 
 ## Yêu cầu
-
 
 ### Cài đặt các gói pip
 
@@ -29,6 +33,7 @@ pip install flask
 pip install flask-cors
 pip install Flask-HTTPAuth
 ```
+
 Chạy main.py
 
 ```
@@ -79,6 +84,7 @@ Authorization: Basic <credentials>
 #### Phản hồi
 
 Nếu thành công:
+
 ```json
 {
   "error": 0,
@@ -87,12 +93,14 @@ Nếu thành công:
 ```
 
 Nếu không thành công:
+
 ```json
 {
   "error": "mã lỗi",
   "message": "thông báo lỗi"
 }
 ```
+
 Hoặc các trường hợp lỗi khác sẽ không theo dạng trên
 
 ### Yêu cầu POST - Lấy chữ ký (signature)
@@ -119,6 +127,7 @@ Authorization: Basic <credentials>
 #### Phản hồi
 
 Nếu thành công:
+
 ```json
 {
   "error": 0,
@@ -127,6 +136,7 @@ Nếu thành công:
 ```
 
 Nếu không thành công:
+
 ```json
 {
   "error": "mã lỗi",
@@ -136,27 +146,65 @@ Nếu không thành công:
 
 Hoặc các trường hợp lỗi khác sẽ không theo dạng trên
 
+### Một số yêu cầu khác phục vụ cho config.json chưa được đề cập tới, ae tự khám phá xD
+
 ## Hướng dẫn triển khai lên [pythonanywhere](https://www.pythonanywhere.com)
+
 ### Giới thiệu
 
 Ưu điểm:
 
-- web sử dụng free
-- hỗ trợ thao tác với file trực quan
-- có log cũng hay hay
-- tạo tài khoản dễ dàng
-- dùng thoải mái có vẻ là vô hạn
+- Web sử dụng free
+- Hỗ trợ thao tác với file trực quan
+- Có log cũng hay hay
+- Tạo tài khoản dễ dàng
+- Dùng thoải mái có vẻ là vô hạn
 
 Nhược điểm:
 
-- cần truy cập lại trang sau 3 tháng
-- khó khăn trong bước cài đặt đầu do có giới hạn
-- khi tới giới hạn là đợi sang hôm sau :D
-- muốn thay đổi gì thì cần edit file rồi lưu lại và cần <b>reload web</b> để áp dụng
+- Cần truy cập lại trang sau 3 tháng
+- Khó khăn trong bước cài đặt đầu do có giới hạn
+- Khi tới giới hạn là đợi sang hôm sau :D
+- Muốn thay đổi tệp main.py thì cần <b>reload web</b> để áp dụng
+
+### Tổng quan
+
+- Tải code lên pythonanywhere, nếu muốn cập nhật hãy giữ lại file config.json và thư mục UTC, sau đó xóa thư mục Nine_CMD_sign đang tồn tại trước khi git clone
+
+```bash
+git clone https://github.com/tandotbt/Nine_CMD_sign.git
+```
+
+- Tạo môi trường ảo, cài thư viện cần
+
+```bash
+mkvirtualenv envServer9cmd --python=/usr/bin/python3.10
+workon envServer9cmd
+pip install flask
+pip install flask-cors
+pip install Flask-HTTPAuth
+```
+
+Thao tác chuẩn thì sẽ tốn khoảng `CPU Usage: 56% used – 56.79s of 100s`, nếu vượt quá 100% thì bạn cần chờ tới ngày mai với tài khoản pythonanywhere miễn phí :v
+
+- Tạo web theo kiểu Manual configuration (including virtualenvs), Python 3.10, chọn đường dẫn cho Source code, Working directory và Virtualenv, cài WSGI configuration đúng với tên username `tanbt` thì sẽ là:
+
+```python
+import sys
+path = '/home/tanbt/Nine_CMD_sign'
+if path not in sys.path:
+    sys.path.append(path)
+from main import app as application
+```
+
+- Cấu hình file config.json, chú ý mục ips là nơi các địa chỉ ip cho phép, nếu bạn không truy cập được do chưa thêm ip thì cần thêm thủ công hoặc để trống [] cho mục ips, và mục useNewSetting đặt false nếu bạn muốn an toàn hơn
+- Upload tệp UTC vào thư mục UTC qua web hoặc upload thủ công thông qua trình quản lý file của pythonanywhere
+- Thỉnh thoảng vào gia hạn cho tên miền của web sống thêm 3 tháng, Disable/Re-enable web khi muốn sài cho an toàn, cài bảo mật 2 lớp cho tài khoản pythonanywhere thì an toàn hơn nữa
 
 ### Hướng dẫn cài đặt
+
 - Bước 1: Tạo tài khoản https://www.pythonanywhere.com
-- Bước 2: Tải mã nguồn lên web
+- Bước 2: Tải mã nguồn lên tài khoản pythonanywhere (Cách mới, bỏ qua bước 2 này mà chuyển tới bước 3)
 
 1. Đăng nhập vào tài khoản PythonAnywhere và truy cập vào Dashboard
 
@@ -186,9 +234,20 @@ pip install Flask-HTTPAuth
 
 1. Sau khi cài pip xong, gõ thêm 1 dòng mã để giải nén file zip với tên <b>srcCode</b> như đã đặt bên trên
 
-```
+```bash
 unzip srcCode.zip
 ```
+
+(Sử dụng cách mới)
+
+1. Dán mã sau và nhấn enter
+
+```bash
+git clone https://github.com/tandotbt/Nine_CMD_sign.git
+```
+
+2. Lưu ý đường dẫn của Working directory sẽ cần sửa thành <b>/home/tanbt/Nine_CMD_sign/</b> thay vì dùng đường dẫn mặc định đang cài, sau đó làm theo hướng dẫn
+
 - Bước 6: Tạo web
 
 1. Giờ quay lại Dashboard, chọn Open Web tab và chọn tiếp Add a new web app
