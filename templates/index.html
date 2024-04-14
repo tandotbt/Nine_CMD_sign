@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Nine CMD Sign v{{VERSION_NOW}}</title>
+
+    <link rel="shortcut icon"
+        href="data:image/x-icon;base64,AAABAAEAEBAAAAEACABoBQAAFgAAACgAAAAQAAAAIAAAAAEACAAAAAAAAAEAAAAAAAAAAAAAAAEAAAAAAAC/v78ASUlJAPn5+QAw7/0AOODtAFZWVgCfn58APuDtAPf39wCBgYEATKizAFRUVABErbYA9fX1ADDv/gBwcHAA8/PzAH19fQDGxsYAt7e3AJmZmQDi4uIA09PTAF1dXQC1tbUATk5OADPr+gD+/v4ARdTfAO/v7wCIiIgAeXl5ANHR0QCzs7MAOOf1APz8/ACGhoYAz8/PAEHBywBZWVkA+vr6AD7DzgCTk5MAP8POANzc3AA64e4ANePxAPj4+ACRkZEAc3NzAMvLywA80NwAMe78AGRkZACtra0A9vb2AI+PjwAw8P8A5+fnANjY2AC6uroAN93qADTs+gD09PQANTU1AI2NjQDl5eUA1tbWADHu/QBvb28Ax8fHALi4uABRUVEAmpqaAPLy8gCFrbAA4+PjADXm8wD///8A8PDwADLq+QD9/f0AUcLLAJaWlgBF094A7u7uAN/f3wB4eHgAUL7GADTm9ABpaWkAS8DJAD7R3ACjo6MA+/v7AJSUlACFhYUAdnZ2AGdnZwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALA9OAgg3NzcCXk5OTCxCYE5OUQg3DTcvKChOThYgThFOGwIoXiNOGyMoTk5WTiUZTggjTk5OTk5OTk5OTk5OTlFKEkcFWlcLSDgfTl5OTk4WHU5OTiBOTk5OTlEICF5OSz8bYU5OTk5OQTBOXi8CGyYVXgFOTihRTh4RTk4bUU49DBBGUU4oI05ANU5OTk5OUDMnLxsjXiNOTk5OTk5OTgNZKVcvG05RTk5OTk5OTlM5NC4rFwgjG05OTk5OTgYhOTk0TVwKWmJFJAlfXTYYEzk5OQ4aLVRSWjE8JBQqMk45OTk5DkQ+IgccWEMAFVVPOTk5OTk5OQ5EGgRbSTc7OgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background: rgb(65, 223, 179);
+            background: linear-gradient(28deg,
+                    rgba(65, 223, 179, 1) 13%,
+                    rgba(255, 240, 48, 1) 91%);
+            background-repeat: no-repeat;
+        }
+
+        input[type='password'],
+        input[type='text'] {
+            width: calc(50% - 5px);
+            padding: 12px 20px;
+            margin: 8px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+
+        .tag-container {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tag-container-checkbox {
+            margin-top: 8px;
+            display: flex;
+            flex-direction: row;
+            align-items: stretch;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+
+        .tag-container-checkbox .tag-checkbox {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+
+        .tag-container-checkbox label {
+            flex-shrink: 0;
+            font-size: 0.875rem;
+            cursor: pointer;
+            font-family: 'Courier New', Courier, monospace;
+            background-color: #f5f5f5;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+        }
+
+        .tag-input {
+            width: 100%;
+            padding: 6px 10px;
+            margin-bottom: 5px;
+        }
+
+        .tag-checkbox {
+            margin-right: 5px;
+        }
+
+        .tag-container button {
+            padding: 10px 20px;
+            margin-left: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            background-color: transparent;
+            transition: background-color 0.3s ease;
+        }
+
+        .tag-container button:first-child {
+            background-color: #4caf50;
+            color: #fff;
+            border-color: #4caf50;
+        }
+
+        .tag-container button:not(:first-child) {
+            color: #4caf50;
+            border-color: #4caf50;
+        }
+
+        .tag-container button.remove-btn {
+            color: #f44336;
+            border-color: #f44336;
+        }
+
+        .tag-container button:not(:first-child):hover {
+            background-color: #45a049;
+            color: #fff;
+        }
+
+        .tag-container button.remove-btn:hover {
+            background-color: #f44336;
+            color: #fff;
+        }
+
+        .tag-container button:not(:first-child):active {
+            background-color: #3e8e41;
+            color: #fff;
+        }
+
+        .tag-container button.remove-btn:active {
+            background-color: #d32f2f;
+            color: #fff;
+        }
+
+        #clearAllBtn {
+            background-color: #f44336;
+            color: #fff;
+            padding: 10px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #clearAllBtn:hover {
+            background-color: #d32f2f;
+        }
+
+        #submitBtn {
+            background-color: #4caf50;
+            color: #fff;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        #submitBtn:hover {
+            background-color: #45a049;
+        }
+
+        input[type='submit'] {
+            display: none;
+        }
+
+        #resultContainer {
+            display: inline-block;
+            margin-left: 20px;
+            vertical-align: middle;
+        }
+
+        .error-message {
+            color: red;
+            margin-top: 5px;
+        }
+
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .login-section,
+        .options-section {
+            flex: 1;
+            margin: 0 20px;
+            max-width: 400px;
+        }
+
+        .form-section {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-section h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .form-section label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .form-section input[type='password'],
+        .form-section input[type='text'] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .content-info {
+            width: 100%;
+            max-width: 100%;
+            margin: 20px 0;
+        }
+
+        .content-info b {
+            font-weight: 700;
+            color: #333;
+        }
+
+        .content-info a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .content-info pre {
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            overflow-x: auto;
+            flex-shrink: 0;
+            font-size: 0.875rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+        }
+
+        #fileManagementSection {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 20px auto;
+        }
+
+        #fileManagementSection h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        #fileManagementSection h3 {
+            margin-bottom: 15px;
+            color: #555;
+        }
+
+        #fileInput {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        #uploadBtn {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        #uploadBtn:hover {
+            background-color: #0056b3;
+        }
+
+        #deleteSelectedBtn {
+            background-color: #f44336;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 15px;
+        }
+
+        #deleteSelectedBtn:hover {
+            background-color: #d32f2f;
+        }
+
+        @media screen and (max-width: 768px) {
+
+            input[type='password'],
+            input[type='text'] {
+                width: 100%;
+            }
+
+            .container {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .login-section,
+            .options-section {
+                width: 100%;
+                max-width: 100%;
+                margin: 20px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    {% if config_data.useNewSetting %}
+    <form id="mainForm" class="form-section container">
+        <div class="login-section">
+            <h2>Nine CMD Sign v{{VERSION_NOW}}</h2>
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" placeholder="admin" value="{{ config_data.username }}" />
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" placeholder="admin" />
+            <label for=" newPassword">New Password:</label>
+            <input type="password" id="newPassword" name="newPassword" />
+            <label for="confirmPassword">Confirm Password:</label>
+            <input type="password" id="confirmPassword" name="confirmPassword" />
+            <div id="errorMessages"></div>
+            <label>IP Addresses:</label>
+            <div class="tag-container" id="ipsContainer">
+                <input hidden type="text" />
+                <button type="button" class="ips-add-btn">Add</button>
+            </div>
+            <label>Websites:</label>
+            <div class="tag-container" id="websitesContainer">
+                <input hidden type="text" />
+                <button type="button" class="websites-add-btn">Add</button>
+            </div>
+            <input type="button" value="Submit" id="submitBtn" />
+            <span id="resultContainer"></span>
+        </div>
+        <div class="options-section">
+            <h2>Options</h2>
+            <label>Allowed Actions:</label>
+            <div class="tag-container-checkbox" id="allowedActionsContainer"></div>
+            <label>Disallowed Actions:</label>
+            <div class="tag-container-checkbox" id="disallowedActionsContainer"></div>
+            <button type="button" id="clearAllBtn">Clear All Fields</button>
+        </div>
+    </form>
+    <br />
+    <div class="form-section container" id="fileManagementSection">
+        <div class="content-info">
+            <h2>File Management</h2>
+            <p>
+                Check for new update:
+                <a target="_blank" href="https://github.com/tandotbt/Nine_CMD_sign">
+                    GitHub-tandotbt/Nine_CMD_sign</a>
+            </p>
+            <p>Your ip: <b>{{client_ip}}</b></p>
+            <span id="errorMessage" class="error-message"></span><span id="loadingMessage"
+                class="loading-message"></span>
+            <div>
+                <h3>Upload File</h3>
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <input type="file" id="fileInput" name="file" />
+                    <button type="submit" id="uploadBtn">Upload</button>
+                </form>
+            </div>
+            <div>
+                <h3>File List</h3>
+                <div id="fileListContainer"></div>
+                <br />
+                <label for="deletePassword">
+                    <h3>Password</h3>
+                </label>
+                <input type="password" id="deletePassword" name="deletePassword"
+                    placeholder="Enter password's address want to remove" />
+                <button type="button" id="deleteSelectedBtn">
+                    Remove Selected Address
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Function to add input field for a specific array
+            function addInputToArray(arrayName) {
+                const container = document.getElementById(arrayName + 'Container');
+                const addButton = document.querySelector(
+                    '.' + arrayName + '-add-btn'
+                );
+
+                addButton.addEventListener('click', function () {
+                    addInput(arrayName);
+                });
+
+                function addInput() {
+                    const newArrayInput = document.createElement('div');
+                    newArrayInput.classList.add('tag-container');
+                    newArrayInput.innerHTML = `<input type="text" class="tag-input" name="${arrayName}[]" placeholder="Enter ${arrayName} value">
+                                    <button type="button" class="${arrayName}-remove-btn remove-btn">-</button>`;
+                    container.appendChild(newArrayInput);
+
+                    const removeButtons = document.querySelectorAll(
+                        '.' + arrayName + '-remove-btn'
+                    );
+                    removeButtons.forEach((button) => {
+                        button.addEventListener('click', function () {
+                            removeInput(button);
+                        });
+                    });
+                }
+
+                function removeInput(button) {
+                    const container = button.parentElement;
+                    container.remove();
+                }
+            }
+
+            // Add input fields for IPs and Websites
+            addInputToArray('ips');
+            addInputToArray('websites');
+
+            // Function to add checkbox options
+            function addCheckboxOption(
+                container,
+                arrayName,
+                label,
+                value,
+                className
+            ) {
+                const optionContainer = document.createElement('div');
+                optionContainer.classList.add('tag-container-checkbox', className); // Add className here
+                optionContainer.innerHTML = `<input type="checkbox" class="tag-checkbox" name="${arrayName}[]" value="${value}">
+                                <label>${label}</label>`;
+
+                container.appendChild(optionContainer);
+            }
+            const LIST_ACTIONS = [
+                { label: 'send NCG', value: 'transfer_asset' },
+                { label: 'refill AP', value: 'daily_reward' },
+                { label: 'use AP potion', value: 'charge_action_point' },
+                { label: 'repeat/sweep', value: 'hack_and_slash' },
+                { label: 'craft', value: 'combination_equipment' },
+                { label: 'craft food', value: 'combination_consumable' },
+                { label: 'upgrade', value: 'item_enhancement' },
+                { label: 'use HG', value: 'rapid_combination' },
+                { label: 'grind crystall', value: 'grinding' },
+                { label: 'attack arena', value: 'battle_arena' },
+                { label: 'attack worldboss', value: 'raid' },
+                { label: 'attack event', value: 'event_dungeon_battle' },
+                { label: 'buy item', value: 'buy_product' },
+                { label: 'sell item', value: 'register_product' },
+                { label: 're-sell item', value: 're_register_product' },
+            ];
+            // Add checkbox options for allowed actions
+            const allowedActionsContainer = document.getElementById(
+                'allowedActionsContainer'
+            );
+            const allowedActions = LIST_ACTIONS;
+
+            allowedActions.forEach((action) => {
+                addCheckboxOption(
+                    allowedActionsContainer,
+                    'allowedActions',
+                    action.label,
+                    action.value
+                );
+            });
+
+            // Add checkbox options for disallowed actions
+            const disallowedActionsContainer = document.getElementById(
+                'disallowedActionsContainer'
+            );
+            const disallowedActions = LIST_ACTIONS;
+
+            disallowedActions.forEach((action) => {
+                addCheckboxOption(
+                    disallowedActionsContainer,
+                    'disallowedActions',
+                    action.label,
+                    action.value
+                );
+            });
+
+            // Clear all fields
+            const clearAllBtn = document.getElementById('clearAllBtn');
+            clearAllBtn.addEventListener('click', function () {
+                const allInputs = document.querySelectorAll('.tag-input');
+                allInputs.forEach((input) => {
+                    input.value = '';
+                });
+
+                const checkboxes = document.querySelectorAll('.tag-checkbox');
+                checkboxes.forEach((checkbox) => {
+                    checkbox.checked = false;
+                    checkbox.disabled = false; // Re-enable checkboxes
+                });
+
+                // Clear new password and confirm password fields
+                document.getElementById('newPassword').value = '';
+                document.getElementById('confirmPassword').value = '';
+            });
+            // Function to disable checkboxes in one group when any checkbox in the other group is checked
+            function handleCheckboxDisable(container1, container2) {
+                const checkboxes1 = container1.querySelectorAll('.tag-checkbox');
+                const checkboxes2 = container2.querySelectorAll('.tag-checkbox');
+
+                function updateCheckboxState() {
+                    checkboxes1.forEach((checkbox1) => {
+                        const isChecked = checkbox1.checked;
+                        checkboxes2.forEach((checkbox2) => {
+                            if (checkbox2.value === checkbox1.value) {
+                                checkbox2.disabled = isChecked;
+                            }
+                        });
+                    });
+
+                    checkboxes2.forEach((checkbox2) => {
+                        const isChecked = checkbox2.checked;
+                        checkboxes1.forEach((checkbox1) => {
+                            if (checkbox1.value === checkbox2.value) {
+                                checkbox1.disabled = isChecked;
+                            }
+                        });
+                    });
+                }
+
+                // Call this function initially to set initial state
+                updateCheckboxState();
+
+                checkboxes1.forEach((checkbox1) => {
+                    checkbox1.addEventListener('change', updateCheckboxState);
+                });
+
+                checkboxes2.forEach((checkbox2) => {
+                    checkbox2.addEventListener('change', updateCheckboxState);
+                });
+            }
+
+            // Call handleCheckboxDisable function for allowed and disallowed actions
+            handleCheckboxDisable(
+                allowedActionsContainer,
+                disallowedActionsContainer
+            );
+            handleCheckboxDisable(
+                disallowedActionsContainer,
+                allowedActionsContainer
+            );
+
+            // Check if label is clicked to toggle checkbox and update checkbox state
+            const allLabels = document.querySelectorAll('label');
+            allLabels.forEach((label) => {
+                label.addEventListener('click', function (e) {
+                    const input = e.target.previousElementSibling;
+                    if (input && input.type === 'checkbox' && !input.disabled) {
+                        // Thêm điều kiện kiểm tra checkbox không được disabled
+                        input.checked = !input.checked;
+
+                        // Update checkbox state
+                        handleCheckboxDisable(
+                            allowedActionsContainer,
+                            disallowedActionsContainer
+                        );
+                        handleCheckboxDisable(
+                            disallowedActionsContainer,
+                            allowedActionsContainer
+                        );
+                    }
+                });
+            });
+
+            const configData = JSON.parse('{{ config_data|tojson }}');
+
+            function setCheckboxState(containerId, configKey) {
+                const container = document.getElementById(containerId);
+                const checkboxes = container.querySelectorAll('.tag-checkbox');
+
+                checkboxes.forEach((checkbox) => {
+                    if (configData[configKey].includes(checkbox.value)) {
+                        checkbox.checked = true;
+                    }
+                });
+            }
+
+            function handleCheckboxDisable(container1, container2) {
+                const checkboxes1 = container1.querySelectorAll('.tag-checkbox');
+                const checkboxes2 = container2.querySelectorAll('.tag-checkbox');
+
+                function updateCheckboxState() {
+                    checkboxes1.forEach((checkbox1) => {
+                        const isChecked = checkbox1.checked;
+                        checkboxes2.forEach((checkbox2) => {
+                            if (checkbox2.value === checkbox1.value) {
+                                checkbox2.disabled = isChecked;
+                            }
+                        });
+                    });
+
+                    checkboxes2.forEach((checkbox2) => {
+                        const isChecked = checkbox2.checked;
+                        checkboxes1.forEach((checkbox1) => {
+                            if (checkbox1.value === checkbox2.value) {
+                                checkbox1.disabled = isChecked;
+                            }
+                        });
+                    });
+                }
+
+                updateCheckboxState();
+
+                checkboxes1.forEach((checkbox1) => {
+                    checkbox1.addEventListener('change', updateCheckboxState);
+                });
+
+                checkboxes2.forEach((checkbox2) => {
+                    checkbox2.addEventListener('change', updateCheckboxState);
+                });
+            }
+
+            function setInputArray(containerId, configKey) {
+                const container = document.getElementById(containerId);
+                const inputArray = configData[configKey];
+
+                // Kiểm tra nếu không có giá trị (tất cả đều trống), trả về để không thực hiện tiếp
+                if (!inputArray || inputArray.every((value) => value === '')) return;
+
+                inputArray.forEach((value) => {
+                    const newArrayInput = document.createElement('div');
+                    newArrayInput.classList.add('tag-container');
+                    newArrayInput.innerHTML = `<input type="text" class="tag-input" name="${configKey}[]" value="${value}">
+                                    <button type="button" class="${configKey}-remove-btn remove-btn">-</button>`;
+                    container.appendChild(newArrayInput);
+
+                    const removeButtons = document.querySelectorAll(
+                        `.${configKey}-remove-btn`
+                    );
+                    removeButtons.forEach((button) => {
+                        button.addEventListener('click', function () {
+                            removeInput(button);
+                        });
+                    });
+                });
+            }
+
+            function removeInput(button) {
+                const container = button.parentElement;
+                container.remove();
+            }
+
+            // Set checkbox state for Allowed Actions
+            setCheckboxState('allowedActionsContainer', 'allowed_actions');
+
+            // Set checkbox state for Disallowed Actions
+            setCheckboxState('disallowedActionsContainer', 'disallowed_actions');
+
+            // Set input fields for IPs and Websites
+            setInputArray('ipsContainer', 'ips');
+            setInputArray('websitesContainer', 'websites');
+
+            // Call handleCheckboxDisable function for allowed and disallowed actions
+            handleCheckboxDisable(
+                document.getElementById('allowedActionsContainer'),
+                document.getElementById('disallowedActionsContainer')
+            );
+
+            handleCheckboxDisable(
+                document.getElementById('disallowedActionsContainer'),
+                document.getElementById('allowedActionsContainer')
+            );
+
+            // Submit form data via AJAX
+            const submitBtn = document.getElementById('submitBtn');
+            const mainForm = document.getElementById('mainForm');
+            const resultContainer = document.getElementById('resultContainer');
+            const errorMessages = document.getElementById('errorMessages');
+
+            submitBtn.addEventListener('click', function () {
+                errorMessages.innerHTML = ''; // Clear previous error messages
+                resultContainer.innerHTML = ''; // Clear previous result messages
+
+                const formData = new FormData(mainForm);
+                const newPassword = formData.get('newPassword');
+                const confirmPassword = formData.get('confirmPassword');
+
+                // Check if username is empty, if yes, set it to 'admin'
+                const username = formData.get('username').trim();
+                if (!username) {
+                    formData.set('username', 'admin');
+                }
+
+                // Check if password is empty, if yes, set it to 'admin'
+                const password = formData.get('password').trim();
+                if (!password) {
+                    formData.set('password', 'admin');
+                }
+
+                if (newPassword !== confirmPassword) {
+                    const errorMessage = document.createElement('div');
+                    errorMessage.classList.add('error-message');
+                    errorMessage.textContent =
+                        'New password and confirm password do not match';
+                    errorMessages.appendChild(errorMessage);
+                    return;
+                }
+
+                fetch('/save_config', {
+                    method: 'POST',
+                    body: formData,
+                })
+                    .then((response) => response.json())
+                    .then((data) => {
+                        resultContainer.innerHTML = `<span>${data.message}</span>`;
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                    });
+            });
+            // Function to refresh file list
+            function refreshFileList() {
+                const errorMessage = document.getElementById('errorMessage');
+                const loadingMessage = document.getElementById('loadingMessage');
+
+                errorMessage.innerHTML = ''; // Clear error message
+                loadingMessage.innerHTML = 'Loading...'; // Show loading message
+
+                fetch('/get_file_list')
+                    .then((response) => response.json())
+                    .then((data) => {
+                        const fileListContainer =
+                            document.getElementById('fileListContainer');
+                        fileListContainer.innerHTML = ''; // Clear previous list
+
+                        if (!data.error) {
+                            data.forEach((file) => {
+                                const fileItem = `
+                                    <div class="file-list-item">
+                                        <input type="radio" class="file-radio" name="fileRadio" value="${file.value}">
+                                        <label for="${file.value}" class="file-label">${file.label}</label>
+                                    </div>
+                                `;
+                                fileListContainer.innerHTML += fileItem;
+                            });
+
+                            // Add event listener to file labels for radio buttons
+                            const fileLabels = document.querySelectorAll('.file-label');
+                            fileLabels.forEach((label) => {
+                                label.addEventListener('click', function (e) {
+                                    const radio =
+                                        e.target.parentElement.querySelector('.file-radio');
+                                    radio.checked = true;
+                                });
+                            });
+                        } else {
+                            errorMessage.innerHTML =
+                                'Failed to get list address. ' + data.message;
+                        }
+
+                        // Clear loading message
+                        loadingMessage.innerHTML = '';
+                    })
+                    .catch((error) => {
+                        console.error('Error:', error);
+                        errorMessage.innerHTML =
+                            'An error occurred while fetching the file list.';
+                        loadingMessage.innerHTML = ''; // Clear loading message
+                    });
+            }
+
+            // Call this function to load file list when the page loads
+            refreshFileList();
+
+            // Submit file and delete selected files
+            document
+                .getElementById('uploadForm')
+                .addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const fileInput = document.getElementById('fileInput');
+                    const errorMessage = document.getElementById('errorMessage');
+                    const loadingMessage = document.getElementById('loadingMessage');
+                    errorMessage.innerHTML = ''; // Clear error message
+                    // Check if a file is selected
+                    if (!fileInput.files || fileInput.files.length === 0) {
+                        errorMessage.innerHTML = 'Please select a file to upload.';
+                        return;
+                    }
+                    loadingMessage.innerHTML = 'Loading...';
+                    const formData = new FormData();
+                    formData.append('file', fileInput.files[0]);
+
+                    fetch('/upload_delete_files', {
+                        method: 'POST',
+                        body: formData,
+                    })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (!data.error) {
+                                // Refresh file list after upload/delete
+                                refreshFileList();
+                            } else {
+                                errorMessage.innerHTML =
+                                    'Failed to upload/delete files. ' + data.message;
+                            }
+                            loadingMessage.innerHTML = ''; // Clear loading message
+                        })
+                        .catch((error) => {
+                            console.error('Error:', error);
+                            errorMessage.innerHTML =
+                                'An error occurred while uploading/deleting files.';
+                            loadingMessage.innerHTML = ''; // Clear loading message
+                        });
+                });
+
+            // Delete selected files
+            document
+                .getElementById('deleteSelectedBtn')
+                .addEventListener('click', function () {
+                    const checkboxes = document.querySelectorAll('.file-radio:checked');
+                    const filesToDelete = Array.from(checkboxes).map(
+                        (checkbox) => checkbox.value
+                    );
+                    const password = document.getElementById('deletePassword').value;
+                    const errorMessage = document.getElementById('errorMessage');
+                    const loadingMessage = document.getElementById('loadingMessage');
+                    errorMessage.innerHTML = ''; // Clear error message
+
+                    if (filesToDelete.length === 0) {
+                        errorMessage.innerHTML = 'Please select files to delete.';
+                        return;
+                    }
+
+                    if (password.length === 0) {
+                        errorMessage.innerHTML = "Please fill password's address.";
+                        return;
+                    }
+                    loadingMessage.innerHTML = 'Loading...';
+                    const formData = new URLSearchParams();
+                    formData.append('filesToDelete', JSON.stringify(filesToDelete));
+                    formData.append('deletePassword', password);
+
+                    fetch('/upload_delete_files', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: formData.toString(),
+                    })
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (!data.error) {
+                                // Refresh file list after delete
+                                refreshFileList();
+                            } else {
+                                errorMessage.innerHTML =
+                                    'Failed to delete files. ' + data.message;
+                                loadingMessage.innerHTML = ''; // Clear loading message
+                            }
+                        })
+                        .catch((error) => {
+                            console.error('Error:', error);
+                            errorMessage.innerHTML =
+                                'An error occurred while deleting files.';
+                            loadingMessage.innerHTML = ''; // Clear loading message
+                        });
+                });
+        });
+    </script>
+    {% else %}
+    <div class="form-section container">
+        <div class="content-info">
+            <h2>Nine CMD Sign v{{VERSION_NOW}}</h2>
+            <label>Check for new update:<a target="_blank" href="https://github.com/tandotbt/Nine_CMD_sign">GitHub -
+                    tandotbt/Nine_CMD_sign</a></label>
+            <label>Your ip: <b>{{client_ip}}</b></label>
+            <label>Address available:</label>
+            <pre>{{stderr | safe}}</pre>
+            <pre>{{stdout | safe}}</pre>
+        </div>
+    </div>
+    {% endif %}
+</body>
+
+</html>

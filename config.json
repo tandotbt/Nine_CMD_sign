@@ -1,0 +1,9 @@
+{
+  "username": "admin",
+  "password": "admin",
+  "ips": [],
+  "allowed_actions": [],
+  "disallowed_actions": ["transfer_asset"],
+  "websites": ["https://tandotbt.github.io/", "https://9cmd.top/"],
+  "useNewSetting": true
+}

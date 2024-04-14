@@ -32,7 +32,7 @@ pip install Flask-HTTPAuth
 Chạy main.py
 
 ```
-(.venv) D:\Nine_CMD_sign>main.py
+(.venv) D:\Nine_CMD_sign>python main.py
  * Serving Flask app 'main'
  * Debug mode: off
 WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
