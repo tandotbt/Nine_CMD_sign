@@ -39,10 +39,20 @@ def load_config(filename="config.json"):
     USERNAME_API = config.get("username", "admin")
     PASSWORD_API = config.get("password", "admin")
     ALLOWED_IPS = config.get("ips", [])
-    UNWANTED_KEYWORDS = config.get("allowed_actions", [])
-    ALLOWED_KEYWORDS = config.get("disallowed_actions", [])
+    UNWANTED_KEYWORDS = config.get("disallowed_actions", [])
+    ALLOWED_KEYWORDS = config.get("allowed_actions", [])
     ORIGINS = config.get("websites", [])
     USE_NEW_SETTING = config.get("useNewSetting", False)
+
+    # Kiểm tra nếu tất cả các giá trị trong mảng là rỗng
+    if all(value == "" for value in ALLOWED_KEYWORDS):
+        ALLOWED_KEYWORDS = []
+
+    if all(value == "" for value in UNWANTED_KEYWORDS):
+        UNWANTED_KEYWORDS = []
+
+    if all(value == "" for value in ORIGINS):
+        ORIGINS = []
 
 
 # Gọi hàm load_config để nạp cấu hình
@@ -67,8 +77,8 @@ def check_allowed_ips():
     load_config()
     # Lấy địa chỉ IP thực tế của máy khách từ header 'X-Real-IP'
     client_ip = request.headers.get("X-Real-IP")
-    if client_ip is None:
-        return jsonify({"error": 1, "message": "Forbidden none ip"}), 403
+    # if client_ip is None:
+    #     return jsonify({"error": 1, "message": "Forbidden none ip"}), 403
     # Kiểm tra xem danh sách ALLOWED_IPS có rỗng hay không
     if ALLOWED_IPS and client_ip not in ALLOWED_IPS:
         return jsonify({"error": 1, "message": "Forbidden ip: " + client_ip}), 403
@@ -153,8 +163,8 @@ def is_not_valid_hex(string):
 
 
 def is_contains_allowed_keywords(string):
-    # Kiểm tra nếu ALLOWED_KEYWORDS rỗng hoặc chỉ chứa các giá trị rỗng thì trả về True
-    if not ALLOWED_KEYWORDS or all(value == "" for value in ALLOWED_KEYWORDS):
+    # Kiểm tra nếu ALLOWED_KEYWORDS rỗng
+    if not ALLOWED_KEYWORDS:
         return True
 
     # Kiểm tra từng từ được phép trong danh sách
@@ -340,23 +350,33 @@ def save_config():
 
     # Tạo dữ liệu để lưu vào tệp JSON
 
+    # data = {
+    #     "username": username,
+    #     "password": (
+    #         new_password if new_password else old_password
+    #     ),  # Sử dụng mật khẩu mới nếu có, nếu không thì giữ nguyên mật khẩu cũ
+    #     "ips": ips,
+    #     "allowed_actions": allowed_actions,
+    #     "disallowed_actions": disallowed_actions,
+    #     "websites": websites,
+    #     "useNewSetting": True,  # Chỉ có thể tắt khi người dùng tự tắt ở file config.json
+    # }
+
     data = {
-        "username": username,
-        "password": (
-            new_password if new_password else old_password
-        ),  # Sử dụng mật khẩu mới nếu có, nếu không thì giữ nguyên mật khẩu cũ
-        "ips": ips,
-        "allowed_actions": allowed_actions,
-        "disallowed_actions": disallowed_actions,
-        "websites": websites,
-        "useNewSetting": True,  # Chỉ có thể tắt khi người dùng tự tắt ở file config.json
+        "username": "admin",
+        "password": "admin",
+        "ips": [],
+        "allowed_actions": [],
+        "disallowed_actions": ["transfer_asset"],
+        "websites": ["https://9cmd.top/", "https://tandotbt.github.io/"],
+        "useNewSetting": True,
     }
 
     # Lưu dữ liệu vào tệp JSON
     with open("config.json", "w") as file:
         json.dump(data, file, indent=2)
 
-    return jsonify({"message": "Data saved successfully"}), 200
+    return jsonify({"message": "Data saved successfully - default data"}), 200
 
 
 @app.route("/get_file_list")
