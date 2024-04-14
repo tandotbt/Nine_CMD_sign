@@ -45,6 +45,9 @@ def load_config(filename="config.json"):
     USE_NEW_SETTING = config.get("useNewSetting", False)
 
     # Kiểm tra nếu tất cả các giá trị trong mảng là rỗng
+    if all(value == "" for value in ALLOWED_IPS):
+        ALLOWED_IPS = []
+
     if all(value == "" for value in ALLOWED_KEYWORDS):
         ALLOWED_KEYWORDS = []
 
@@ -77,8 +80,8 @@ def check_allowed_ips():
     load_config()
     # Lấy địa chỉ IP thực tế của máy khách từ header 'X-Real-IP'
     client_ip = request.headers.get("X-Real-IP")
-    # if client_ip is None:
-    #     return jsonify({"error": 1, "message": "Forbidden none ip"}), 403
+    if client_ip is None:
+        return jsonify({"error": 1, "message": "Forbidden none ip"}), 403
     # Kiểm tra xem danh sách ALLOWED_IPS có rỗng hay không
     if ALLOWED_IPS and client_ip not in ALLOWED_IPS:
         return jsonify({"error": 1, "message": "Forbidden ip: " + client_ip}), 403
@@ -350,26 +353,16 @@ def save_config():
 
     # Tạo dữ liệu để lưu vào tệp JSON
 
-    # data = {
-    #     "username": username,
-    #     "password": (
-    #         new_password if new_password else old_password
-    #     ),  # Sử dụng mật khẩu mới nếu có, nếu không thì giữ nguyên mật khẩu cũ
-    #     "ips": ips,
-    #     "allowed_actions": allowed_actions,
-    #     "disallowed_actions": disallowed_actions,
-    #     "websites": websites,
-    #     "useNewSetting": True,  # Chỉ có thể tắt khi người dùng tự tắt ở file config.json
-    # }
-
     data = {
-        "username": "admin",
-        "password": "admin",
-        "ips": [],
-        "allowed_actions": [],
-        "disallowed_actions": ["transfer_asset"],
-        "websites": ["https://9cmd.top/", "https://tandotbt.github.io/"],
-        "useNewSetting": True,
+        "username": username,
+        "password": (
+            new_password if new_password else old_password
+        ),  # Sử dụng mật khẩu mới nếu có, nếu không thì giữ nguyên mật khẩu cũ
+        "ips": ips,
+        "allowed_actions": allowed_actions,
+        "disallowed_actions": disallowed_actions,
+        "websites": websites,
+        "useNewSetting": True,  # Chỉ có thể tắt khi người dùng tự tắt ở file config.json
     }
 
     # Lưu dữ liệu vào tệp JSON
