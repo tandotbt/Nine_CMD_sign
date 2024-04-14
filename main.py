@@ -9,6 +9,7 @@ import re
 import json
 
 VERSION_NOW = "1.0"
+MAX_SIZE_FILE_UTC = 500
 
 
 def load_config(filename="config.json"):
@@ -436,6 +437,19 @@ def upload_delete_files():
 
     uploaded_file = request.files.get("file")
     if uploaded_file:
+        buffer = uploaded_file.getbuffer()
+        size = len(buffer)
+        if size > MAX_SIZE_FILE_UTC:
+            return (
+                jsonify(
+                    {
+                        "error": 1,
+                        "message": "File size exceeds the limit.",
+                    }
+                ),
+                400,
+            )
+
         file_path = os.path.join(uploaded_file.filename)
         try:
             uploaded_file.save(file_path)

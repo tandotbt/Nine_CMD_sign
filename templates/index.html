@@ -779,6 +779,11 @@
                         errorMessage.innerHTML = 'Please select a file to upload.';
                         return;
                     }
+                    // Check file size (limit to 500 bytes)
+                    if (fileInput.files[0].size > 500) {
+                        errorMessage.innerHTML = 'File size exceeds the limit.';
+                        return;
+                    }
                     loadingMessage.innerHTML = 'Loading...';
                     const formData = new FormData();
                     formData.append('file', fileInput.files[0]);
@@ -795,8 +800,9 @@
                             } else {
                                 errorMessage.innerHTML =
                                     'Failed to upload/delete files. ' + data.message;
+                                loadingMessage.innerHTML = ''; // Clear loading message
                             }
-                            loadingMessage.innerHTML = ''; // Clear loading message
+
                         })
                         .catch((error) => {
                             console.error('Error:', error);
