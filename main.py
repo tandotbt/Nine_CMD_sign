@@ -10,7 +10,7 @@ from urllib.parse import quote, unquote
 import random
 import string
 
-VERSION_NOW = "1.0"
+VERSION_NOW = "2.0"
 MAX_SIZE_FILE_UTC = 500
 # Gọi hàm và thiết lập dung lượng tối đa là 10MB (10 * 1024 * 1024 bytes)
 AUTO_CLEAN_TMP_FILE = 10 * 1024 * 1024

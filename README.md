@@ -4,8 +4,9 @@
 
 > [!WARNING]
 > Hãy nâng cấp lên phiên bản v2, những phiên bản trước đó tiềm ẩn nguy cơ bảo mật
-> Khuyến nghị đặt "useNewSetting": false trong tệp config,json và chỉnh sửa tệp config.json thủ công
-> Đặt true thì tiện chỉnh sửa tệp config.json ở web nhưng không an toàn bằng vì có thể có lỗ hổng bảo mật mà chưa lường trước được.
+
+> [!NOTE]
+> Khuyến nghị đặt "useNewSetting": false trong tệp config,json và chỉnh sửa tệp config.json thủ công. Đặt true thì tiện chỉnh sửa tệp config.json ở web nhưng không an toàn bằng vì có thể có lỗ hổng bảo mật mà chưa lường trước được.
 
 ## Giới thiệu
 
