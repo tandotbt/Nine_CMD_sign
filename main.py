@@ -1,15 +1,19 @@
 from flask import Flask, request, render_template, jsonify
 from flask_httpauth import HTTPBasicAuth
 from flask_cors import CORS
-from urllib.parse import unquote
 import platform
 import subprocess
 import os
 import re
 import json
+from urllib.parse import quote, unquote
+import random
+import string
 
 VERSION_NOW = "1.0"
 MAX_SIZE_FILE_UTC = 500
+# Gọi hàm và thiết lập dung lượng tối đa là 10MB (10 * 1024 * 1024 bytes)
+AUTO_CLEAN_TMP_FILE = 10 * 1024 * 1024
 
 
 def load_config(filename="config.json"):
@@ -42,7 +46,7 @@ def load_config(filename="config.json"):
     ALLOWED_IPS = config.get("ips", [])
     UNWANTED_KEYWORDS = config.get("disallowed_actions", [])
     ALLOWED_KEYWORDS = config.get("allowed_actions", [])
-    ORIGINS = config.get("websites", [])
+    ORIGINS = config.get("websites", ["*"])
     USE_NEW_SETTING = config.get("useNewSetting", False)
 
     # Kiểm tra nếu tất cả các giá trị trong mảng là rỗng
@@ -56,21 +60,21 @@ def load_config(filename="config.json"):
         UNWANTED_KEYWORDS = []
 
     if all(value == "" for value in ORIGINS):
-        ORIGINS = []
+        ORIGINS = ["*"]
 
-
-# Gọi hàm load_config để nạp cấu hình
-load_config()
 
 app = Flask(__name__)
 auth = HTTPBasicAuth()
+
+# Gọi hàm load_config để nạp cấu hình
+load_config()
 
 
 @auth.verify_password
 def verify_password(username, password):
     # Kiểm tra thông tin đăng nhập từ người dùng và trả về True hoặc False
     # dựa vào kết quả xác thực
-    if username == USERNAME_API and password == PASSWORD_API:
+    if quote(username) == USERNAME_API and quote(password) == PASSWORD_API:
         return True
     else:
         return False
@@ -85,7 +89,7 @@ def check_allowed_ips():
         return jsonify({"error": 1, "message": "Forbidden none ip"}), 403
     # Kiểm tra xem danh sách ALLOWED_IPS có rỗng hay không
     if ALLOWED_IPS and client_ip not in ALLOWED_IPS:
-        return jsonify({"error": 1, "message": "Forbidden ip: " + client_ip}), 403
+        return jsonify({"error": 1, "message": f"Forbidden ip: {client_ip}"}), 403
 
 
 CORS(app, resources={r"/*": {"origins": ORIGINS}})
@@ -116,17 +120,17 @@ ERROR_MESSAGE = {
 LIST_COMMAND = {
     "windows": {
         "getKeyid": '"./planetWindows/planet" key --path "./UTC"',
-        "getPublicKey": '"./planetWindows/planet" key export --passphrase %password% --public-key --path "./UTC" %keyId%',
-        "getSignature": '"./planetWindows/planet" key sign --passphrase %password% --store-path "./UTC" %keyId% action',
+        "getPublicKey": '"./planetWindows/planet" key export --passphrase-file %passwordPath% --public-key --path "./UTC" %keyId%',
+        "getSignature": '"./planetWindows/planet" key sign --passphrase-file %passwordPath% --store-path "./UTC" %keyId% %filePathUnsignedTransaction%',
         "importKey": '"./planetWindows/planet" key import --json %fileName% --path "./UTC"',
-        "removeKey": '"./planetWindows/planet" key remove --passphrase %password% --path "./UTC" %keyId%',
+        "removeKey": '"./planetWindows/planet" key remove --passphrase-file %passwordPath% --path "./UTC" %keyId%',
     },
     "linux": {
         "getKeyid": '"./planetLinux/planet" key --path "./UTC"',
-        "getPublicKey": '"./planetLinux/planet" key export --passphrase %password% --public-key --path "./UTC" %keyId%',
-        "getSignature": '"./planetLinux/planet" key sign --passphrase %password% --store-path "./UTC" %keyId% action',
+        "getPublicKey": '"./planetLinux/planet" key export --passphrase-file %passwordPath% --public-key --path "./UTC" %keyId%',
+        "getSignature": '"./planetLinux/planet" key sign --passphrase-file %passwordPath% --store-path "./UTC" %keyId% %filePathUnsignedTransaction%',
         "importKey": '"./planetLinux/planet" key import --json %fileName% --path "./UTC"',
-        "removeKey": '"./planetLinux/planet" key remove --passphrase %password% --path "./UTC" %keyId%',
+        "removeKey": '"./planetLinux/planet" key remove --passphrase-file %passwordPath% --path "./UTC" %keyId%',
     },
 }
 
@@ -190,6 +194,101 @@ def is_contains_unwanted_keywords(string):
     return False
 
 
+def try_reload_pythonanywhere(current_url):
+    try:
+        # Sử dụng phép chia chuỗi để trích xuất username từ URL
+        parts = current_url.split(".")
+
+        if len(parts) >= 2:
+            username = parts[0].split("//")[-1]
+
+            # Mẹo chạy mã bash để reload web pythonanywhere
+            subprocess.run(
+                ["touch", f"/var/www/{username}_pythonanywhere_com_wsgi.py"], check=True
+            )
+
+            return f"tried reload {username}.pythonanywhere.com web"
+        else:
+            return "you need manual reload"
+    except Exception as e:
+        return "you need manual reload"
+
+
+def extract_column(text):
+    # Tách chuỗi dựa trên dấu cách và ký tự xuống dòng
+    lines = text.split("\n")
+
+    # Tạo một danh sách để chứa giá trị cột số 2
+    column_values = []
+
+    for line in lines:
+        # Tách các giá trị trong mỗi dòng dựa trên dấu cách và dấu tab
+        values = re.split(r"\s+|\t", line)
+
+        # Lấy giá trị cột số 2 nếu có
+        if len(values) == 2:
+            column_values.append(values[1].strip())
+        if len(values) > 2:
+            column_values.append(values[2].strip())
+    return column_values
+
+
+def save_file_or_default(data_save, type="tmp"):
+    random_string = "".join(random.choice(string.ascii_lowercase) for _ in range(8))
+    try:
+        name = f"{type}_{random_string}.txt"
+        file_path = os.path.join("tmp", name)
+        with open(file_path, "w") as file:
+            file.write(data_save)
+        return name
+    except Exception as e:
+        print(f"Lỗi khi lưu file: {e}")
+        return "tmp_error.txt"
+
+
+def read_file_or_default(random_name):
+    try:
+        file_path = os.path.join("tmp", random_name)
+        with open(file_path, "r") as file:
+            return file.read()
+    except Exception as e:
+        print(f"Lỗi khi đọc file: {e}")
+        return "data-error"
+
+
+def clean_tmp_folder(max_size):
+    folder_path = "tmp"
+
+    # Kiểm tra xem thư mục tmp đã tồn tại hay chưa
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        return  # Thoát khỏi hàm nếu thư mục mới được tạo
+
+    # Lấy danh sách các file trong thư mục
+    files = os.listdir(folder_path)
+
+    # Tính tổng dung lượng của các file
+    total_size = sum(
+        os.path.getsize(os.path.join(folder_path, file_name)) for file_name in files
+    )
+
+    # Kiểm tra dung lượng và xóa các file cũ nếu cần
+    if total_size > max_size:
+        # Sắp xếp các file theo thời gian chỉnh sửa (mới nhất đến cũ nhất)
+        files.sort(
+            key=lambda x: os.path.getmtime(os.path.join(folder_path, x)), reverse=True
+        )
+
+        # Xóa các file cũ cho đến khi tổng dung lượng dưới ngưỡng
+        current_size = total_size
+        for file_name in files:
+            if current_size <= max_size:
+                break
+            file_path = os.path.join(folder_path, file_name)
+            current_size -= os.path.getsize(file_path)
+            os.remove(file_path)
+
+
 @app.route("/")
 @auth.login_required
 def index():
@@ -202,28 +301,31 @@ def index():
         message = ERROR_MESSAGE["en"]["10000"].replace(
             "%yourSystem%", str(platform.system())
         )
-        return jsonify({"error": 10000, "message": message})
+        return jsonify({"error": 10000, "message": message}), 400
     command = LIST_COMMAND[osCommand]["getKeyid"]
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    stderr = re.sub(r"\n", "<br>", result.stderr)
-    stderr = re.sub(r"\t", "&nbsp;&nbsp;&nbsp;&nbsp;", stderr)
+    # Xử lý stderr
+    stderr_values = extract_column(result.stderr)
 
-    stdout = re.sub(r"\n", "<br>", result.stdout)
-    stdout = re.sub(r"\t", "&nbsp;&nbsp;&nbsp;&nbsp;", stdout)
+    # Xử lý stdout
+    stdout_values = extract_column(result.stdout)
+
     client_ip = request.headers.get("X-Real-IP")
     config_data = {
-        "username": USERNAME_API,
+        "username": unquote(USERNAME_API),
         "ips": ALLOWED_IPS,
         "allowed_actions": ALLOWED_KEYWORDS,
         "disallowed_actions": UNWANTED_KEYWORDS,
         "websites": ORIGINS,
         "useNewSetting": USE_NEW_SETTING,
     }
+    # Dọn rác thư mục tmp
+    clean_tmp_folder(AUTO_CLEAN_TMP_FILE)
     return render_template(
         "index.html",
         VERSION_NOW=VERSION_NOW,
-        stderr=stderr,
-        stdout=stdout,
+        stderr_values=stderr_values,
+        stdout_values=stdout_values,
         client_ip=client_ip,
         config_data=config_data,
     )
@@ -234,6 +336,17 @@ def check_password(old_password):
     if old_password == PASSWORD_API:
         return True
     return False
+
+
+def clean_and_replace(input_list):
+    cleaned_list = []
+    for item in input_list:
+        # Loại bỏ mã HTML và JS
+        cleaned_item = re.sub(r"<.*?>|&.*?;", "", item)
+        # Đổi dấu nháy " thành dấu '
+        cleaned_item = cleaned_item.replace('"', "'")
+        cleaned_list.append(cleaned_item)
+    return cleaned_list
 
 
 @app.route("/publicKey", methods=["POST"])
@@ -257,9 +370,11 @@ def get_public_key():
     error, keyId = haveWallet(agentAddress, osCommand, locale)
     if error != 0:
         return jsonify({"error": error, "message": keyId}), 400
+    file_name_password = save_file_or_default(str(password), "password")
+    file_path_password = os.path.join("tmp", file_name_password)
     command = (
         LIST_COMMAND[osCommand]["getPublicKey"]
-        .replace("%password%", str(password))
+        .replace("%passwordPath%", str(file_path_password))
         .replace("%keyId%", str(keyId))
     )
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
@@ -306,12 +421,26 @@ def get_signature():
     error, keyId = haveWallet(agentAddress, osCommand, locale)
     if error != 0:
         return jsonify({"error": error, "message": keyId}), 400
-    with open("action", "wb") as f:
-        f.write(bytes.fromhex(unsignedTransaction))
+
+    random_string = "".join(random.choice(string.ascii_lowercase) for _ in range(8))
+    try:
+        name = f"action_{random_string}.txt"
+        file_path = os.path.join("tmp", name)
+        with open(file_path, "wb") as file:
+            file.write(bytes.fromhex(unsignedTransaction))
+        file_name_unsignedTransaction = name
+    except Exception as e:
+        print(f"Lỗi khi lưu file: {e}")
+        file_name_unsignedTransaction = "tmp_error.txt"
+    file_path_unsignedTransaction = os.path.join("tmp", file_name_unsignedTransaction)
+    file_name_password = save_file_or_default(str(password), "password")
+    file_path_password = os.path.join("tmp", file_name_password)
+
     command = (
         LIST_COMMAND[osCommand]["getSignature"]
-        .replace("%password%", str(password))
+        .replace("%passwordPath%", str(file_path_password))
         .replace("%keyId%", str(keyId))
+        .replace("%filePathUnsignedTransaction%", str(file_path_unsignedTransaction))
     )
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     signature = result.stdout
@@ -323,7 +452,7 @@ def get_signature():
     else:
         message = signature.replace("\n", "")
         error = 0
-        return jsonify({"error": error, "message": message})
+        return jsonify({"error": error, "message": message}), 200
 
 
 @app.route("/save_config", methods=["POST"])
@@ -331,12 +460,16 @@ def get_signature():
 def save_config():
     if not USE_NEW_SETTING:
         message = ERROR_MESSAGE["en"]["11000"]
-        return jsonify({"error": 11000, "message": message})
-    # Lấy dữ liệu từ form
-    username = request.form["username"]
-    old_password = request.form["password"]
-    new_password = request.form.get("newPassword")
-    confirm_password = request.form.get("confirmPassword")
+        return jsonify({"error": 11000, "message": message}), 400
+
+    # Lấy URL hiện tại từ request
+    current_url = request.url
+
+    # Lấy dữ liệu từ form và mã hóa
+    username = quote(request.form["username"])
+    old_password = quote(request.form["password"])
+    new_password = quote(request.form.get("newPassword", ""))
+    confirm_password = quote(request.form.get("confirmPassword", ""))
 
     # Kiểm tra xem mật khẩu cũ có khớp với mật khẩu trong hệ thống không
     if not check_password(old_password):
@@ -346,31 +479,44 @@ def save_config():
     if new_password and new_password != confirm_password:
         return jsonify({"message": "New passwords do not match"}), 400
 
-    # Lấy dữ liệu khác từ form
-    ips = list(set(request.form.getlist("ips[]")))
-    allowed_actions = list(set(request.form.getlist("allowedActions[]")))
-    disallowed_actions = list(set(request.form.getlist("disallowedActions[]")))
-    websites = list(set(request.form.getlist("websites[]")))
+    # Loại bỏ các giá trị rỗng và mã HTML, JS từ dữ liệu
+    ips = clean_and_replace(list(filter(None, set(request.form.getlist("ips[]")))))
+    allowed_actions = list(filter(None, set(request.form.getlist("allowedActions[]"))))
+    disallowed_actions = list(
+        filter(None, set(request.form.getlist("disallowedActions[]")))
+    )
+    websites = clean_and_replace(
+        list(filter(None, set(request.form.getlist("websites[]"))))
+    )
 
     # Tạo dữ liệu để lưu vào tệp JSON
-
     data = {
         "username": username,
-        "password": (
-            new_password if new_password else old_password
-        ),  # Sử dụng mật khẩu mới nếu có, nếu không thì giữ nguyên mật khẩu cũ
+        "password": new_password if new_password else old_password,
         "ips": ips,
         "allowed_actions": allowed_actions,
         "disallowed_actions": disallowed_actions,
         "websites": websites,
-        "useNewSetting": True,  # Chỉ có thể tắt khi người dùng tự tắt ở file config.json
+        "useNewSetting": True,
     }
 
     # Lưu dữ liệu vào tệp JSON
     with open("config.json", "w") as file:
         json.dump(data, file, indent=2)
 
-    return jsonify({"message": "Data saved successfully - default data"}), 200
+    # Chỉ gọi try_reload_pythonanywhere(current_url) khi giá trị websites khác với ORIGINS
+    if set(websites) != set(ORIGINS):
+        return (
+            jsonify(
+                {
+                    "message": "Data saved successfully - "
+                    + try_reload_pythonanywhere(current_url)
+                }
+            ),
+            200,
+        )
+    else:
+        return jsonify({"message": "Data saved successfully"}), 200
 
 
 @app.route("/get_file_list")
@@ -378,7 +524,7 @@ def save_config():
 def get_file_list():
     if not USE_NEW_SETTING:
         message = ERROR_MESSAGE["en"]["11000"]
-        return jsonify({"error": 11000, "message": message})
+        return jsonify({"error": 11000, "message": message}), 400
     if platform.system() == "Windows":
         osCommand = "windows"
     elif platform.system() == "Linux":
@@ -391,8 +537,6 @@ def get_file_list():
         return jsonify({"error": 10000, "message": message}), 400
     command = LIST_COMMAND[osCommand]["getKeyid"]
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
-    # stderr = re.sub(r"\n", "<br>", result.stderr)
-    # stderr = re.sub(r"\t", "&nbsp;&nbsp;&nbsp;&nbsp;", stderr)
 
     stdout = result.stdout.strip()  # Remove any leading/trailing whitespaces
     lines = stdout.split("\n")  # Split stdout by newline
@@ -407,11 +551,12 @@ def get_file_list():
             value = parts[
                 0
             ].strip()  # Get value and remove leading/trailing whitespaces
+            file_name_key_id = save_file_or_default(value, "key_id")
             files.append(
-                {"label": label, "value": value}
+                {"label": label, "value": file_name_key_id}
             )  # Add to list as a dictionary
 
-    return jsonify(files)
+    return jsonify(files), 200
 
 
 @app.route("/upload_delete_files", methods=["POST"])
@@ -419,7 +564,7 @@ def get_file_list():
 def upload_delete_files():
     if not USE_NEW_SETTING:
         message = ERROR_MESSAGE["en"]["11000"]
-        return jsonify({"error": 11000, "message": message})
+        return jsonify({"error": 11000, "message": message}), 400
     if platform.system() == "Windows":
         osCommand = "windows"
     elif platform.system() == "Linux":
@@ -449,8 +594,8 @@ def upload_delete_files():
                 ),
                 400,
             )
-
-        file_path = os.path.join(uploaded_file.filename)
+        random_string = "".join(random.choice(string.ascii_lowercase) for _ in range(8))
+        file_path = os.path.join("tmp", f"UTC_{random_string}.txt")
         try:
             uploaded_file.save(file_path)
         except Exception as e:
@@ -470,11 +615,16 @@ def upload_delete_files():
             message = err.replace("\n", "")
             return jsonify({"error": 1, "message": message}), 400
 
-    for file_name in files_to_delete:
+    for file_name_random_key_id in files_to_delete:
+        key_id = read_file_or_default(str(file_name_random_key_id))
+        file_name_delete_password = save_file_or_default(
+            str(delete_password), "delete_password"
+        )
+        file_path_delete_password = os.path.join("tmp", file_name_delete_password)
         command = (
             LIST_COMMAND[osCommand]["removeKey"]
-            .replace("%password%", str(delete_password))
-            .replace("%keyId%", str(file_name))
+            .replace("%passwordPath%", str(file_path_delete_password))
+            .replace("%keyId%", str(key_id))
         )
         result = subprocess.run(command, shell=True, capture_output=True, text=True)
         err = result.stderr
@@ -482,7 +632,7 @@ def upload_delete_files():
             message = err.replace("\n", "")
             return jsonify({"error": 1, "message": message}), 400
 
-    return jsonify({"error": 0, "message": "Ok"})
+    return jsonify({"error": 0, "message": "Ok"}), 200
 
 
 if __name__ == "__main__":

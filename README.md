@@ -2,6 +2,11 @@
 
 ![](https://i.imgur.com/pT003IC.png)
 
+> [!WARNING]
+> Hãy nâng cấp lên phiên bản v2, những phiên bản trước đó tiềm ẩn nguy cơ bảo mật
+> Khuyến nghị đặt "useNewSetting": false trong tệp config,json và chỉnh sửa tệp config.json thủ công
+> Đặt true thì tiện chỉnh sửa tệp config.json ở web nhưng không an toàn bằng vì có thể có lỗ hổng bảo mật mà chưa lường trước được.
+
 ## Giới thiệu
 
 ### Server ký các giao dịch của game Nine Chronicles bằng api python
@@ -169,13 +174,13 @@ Nhược điểm:
 
 ### Tổng quan
 
-- Tải code lên pythonanywhere, nếu muốn cập nhật hãy giữ lại file config.json và thư mục UTC, sau đó xóa thư mục Nine_CMD_sign đang tồn tại trước khi git clone
+- Tải code lên pythonanywhere, nếu muốn cập nhật hãy giữ lại file config.json và thư mục UTC, sau đó xóa thư mục Nine_CMD_sign đang tồn tại trước khi chạy mã git clone
 
 ```bash
 git clone https://github.com/tandotbt/Nine_CMD_sign.git
 ```
 
-- Tạo môi trường ảo, cài thư viện cần
+- Tạo môi trường ảo, cài thư viện cần thiết
 
 ```bash
 mkvirtualenv envServer9cmd --python=/usr/bin/python3.10
@@ -200,6 +205,7 @@ from main import app as application
 - Cấu hình file config.json, chú ý mục ips là nơi các địa chỉ ip cho phép, nếu bạn không truy cập được do chưa thêm ip thì cần thêm thủ công hoặc để trống [] cho mục ips, và mục useNewSetting đặt false nếu bạn muốn an toàn hơn
 - Upload tệp UTC vào thư mục UTC qua web hoặc upload thủ công thông qua trình quản lý file của pythonanywhere
 - Thỉnh thoảng vào gia hạn cho tên miền của web sống thêm 3 tháng, Disable/Re-enable web khi muốn sài cho an toàn, cài bảo mật 2 lớp cho tài khoản pythonanywhere thì an toàn hơn nữa
+- Có một thư mục .git không sử dụng tới, bạn có thể xóa đi
 
 ### Hướng dẫn cài đặt
 
@@ -279,6 +285,7 @@ from main import app as application
 3. Cạnh Source code có Go to directory, nhấn vào đó sẽ ra thư mục chứa file main.py và thư mục UTC.
 
 Trong file main.py tìm tới các dòng sau và chỉnh sửa theo mong muốn của bạn để bảo mật hơn sau đó Save lại
+Từ phiên bản v1 thì những dữ liệu này được chỉnh sửa trong tệp config.json, và vẫn cần reload lại để áp dụng cho chắc
 
 ```python
 # Username và password xác thực
