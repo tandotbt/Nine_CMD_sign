@@ -301,6 +301,12 @@
                 margin: 20px 0;
             }
         }
+
+        .toggleShowHide {
+            opacity: 0.5;
+            filter: blur(4px);
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -349,7 +355,7 @@
                 <a target="_blank" href="https://github.com/tandotbt/Nine_CMD_sign">
                     GitHub-tandotbt/Nine_CMD_sign</a>
             </p>
-            <p>Your ip: <b>{{client_ip}}</b></p>
+            <p>Your ip: <b class="toggleShowHide" onclick="toggleOpacity(this)">{{client_ip}}</b></p>
             <span id="errorMessage" class="error-message"></span><span id="loadingMessage"
                 class="loading-message"></span>
             <div>
@@ -871,7 +877,7 @@
             <h2>Nine CMD Sign v{{VERSION_NOW}}</h2>
             <label>Check for new update:<a target="_blank" href="https://github.com/tandotbt/Nine_CMD_sign">GitHub -
                     tandotbt/Nine_CMD_sign</a></label>
-            <label>Your ip: <b>{{client_ip}}</b></label>
+            <label>Your ip: <b class="toggleShowHide" onclick="toggleOpacity(this)">{{client_ip}}</b></label>
             <label>Address available:</label>
             <pre>
                 {% for value in stderr_values %}
@@ -887,6 +893,18 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Thẻ script dùng chung -->
+    <script>
+        // Hàm làm mờ element
+        function toggleOpacity(element) {
+            if (element.classList.contains('toggleShowHide')) {
+                element.classList.remove('toggleShowHide')
+            } else {
+                element.classList.add('toggleShowHide')
+            }
+        }
+    </script>
 </body>
 
 </html>
